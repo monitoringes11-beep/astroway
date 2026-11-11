@@ -1,5 +1,6 @@
 import 'package:astroway/data/dream_base.dart';
 import 'package:astroway/logic/daily.dart';
+import 'package:astroway/logic/horoscope.dart';
 import 'package:astroway/logic/interpret.dart';
 import 'package:astroway/logic/memory.dart';
 import 'package:astroway/logic/moon.dart';
@@ -9,6 +10,9 @@ import 'package:astroway/screens/home.dart';
 
 import 'dart:io';
 
+import 'package:astroway/main.dart';
+import 'package:astroway/screens/horoscope.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -79,5 +83,38 @@ void main() {
     expect(r.memoryLine, contains('связала образ «Вода»'));
     expect(r.memoryLine, contains('переезд'));
     expect(r.witchQuestion, contains('Вода'));
+  });
+
+  test('гороскоп стабилен в течение дня и разный у знаков', () {
+    final d = DateTime(2026, 11, 11, 9), e = DateTime(2026, 11, 11, 22);
+    expect(horoscopeFor(10, d).general, horoscopeFor(10, e).general);
+    expect(horoscopeFor(10, d, easy: true).general, contains(RegExp(r'[^\x00-\u04ff]')));
+    expect(horoscopeFor(10, d, week: true).week, hasLength(3));
+    expect(horoscopeFor(10, d).numbers.every((n) => n >= 1 && n <= 40), isTrue);
+  });
+
+  test('восточный знак и совместимость', () {
+    expect(eastAnimals[eastIndexOf(DateTime(1990, 11, 5))][0], 'Лошадь');
+    expect(eastAnimals[eastIndexOf(DateTime(1990, 1, 20))][0], 'Змея');
+    expect(eastBestWith(6), ['Тигр', 'Собака']);
+    expect(compatibility(3, 7).level, contains('Одна стихия'));
+    expect(compatibility(0, 2).level, contains('дополняют'));
+    expect(compatibility(0, 3).level, contains('компромисс'));
+  });
+
+  testWidgets('экран гороскопа открывается на всех вкладках', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppState(Store(await SharedPreferences.getInstance()));
+    await app.store.saveProfile(anna);
+    await tester.pumpWidget(MaterialApp(home: HoroscopeScreen(app: app)));
+    expect(find.textContaining('Скорпион'), findsWidgets);
+    for (final tab in ['На неделю', 'Восточный', '💎 Совместимость', 'На сегодня']) {
+      await tester.tap(find.text(tab));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('Восточный'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Лошадь'), findsWidgets);
+    expect(tester.takeException(), isNull);
   });
 }

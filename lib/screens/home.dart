@@ -9,6 +9,7 @@ import '../logic/zodiac.dart';
 import '../main.dart';
 import '../theme.dart';
 import 'dream.dart';
+import 'horoscope.dart';
 import 'onboarding.dart';
 
 enum Scene { morning, day, night }
@@ -210,7 +211,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       'Сонник',
                       () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DreamScreen(app: app))),
                     ),
-                    _Tile('☀️', 'Гороскоп', () => _soon('Гороскоп')),
+                    _Tile(
+                      '☀️',
+                      'Гороскоп',
+                      () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => HoroscopeScreen(app: app))),
+                    ),
                     _Tile('🃏', 'Расклады', () => _soon('Расклады')),
                     _Tile('⭐', 'Знаки судьбы', () => _soon('Знаки судьбы')),
                     _Tile('🌗', 'Луна и Солнце', () => _soon('Луна и Солнце')),
