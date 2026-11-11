@@ -10,6 +10,7 @@ import '../main.dart';
 import '../theme.dart';
 import 'dream.dart';
 import 'horoscope.dart';
+import 'numerology.dart';
 import 'onboarding.dart';
 
 enum Scene { morning, day, night }
@@ -219,7 +220,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     _Tile('🃏', 'Расклады', () => _soon('Расклады')),
                     _Tile('⭐', 'Знаки судьбы', () => _soon('Знаки судьбы')),
                     _Tile('🌗', 'Луна и Солнце', () => _soon('Луна и Солнце')),
-                    _Tile('7', 'Нумерология', () => _soon('Нумерология')),
+                    _Tile(
+                      '7',
+                      'Нумерология',
+                      () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NumerologyScreen(app: app))),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),

@@ -4,6 +4,8 @@ import 'package:astroway/logic/horoscope.dart';
 import 'package:astroway/logic/interpret.dart';
 import 'package:astroway/logic/memory.dart';
 import 'package:astroway/logic/moon.dart';
+import 'package:astroway/logic/numerology.dart';
+import 'package:astroway/data/numerology_texts.dart';
 import 'package:astroway/logic/profile.dart';
 import 'package:astroway/logic/zodiac.dart';
 import 'package:astroway/screens/home.dart';
@@ -12,6 +14,7 @@ import 'dart:io';
 
 import 'package:astroway/main.dart';
 import 'package:astroway/screens/horoscope.dart';
+import 'package:astroway/screens/numerology.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -115,6 +118,37 @@ void main() {
     await tester.tap(find.text('Восточный'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Лошадь'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('нумерология: расчёты', () {
+    final b = DateTime(1990, 11, 5);
+    expect(lifePath(b).n, 8); // 0+5+1+1+1+9+9+0 = 26 → 8
+    expect(lifePath(DateTime(1992, 11, 29)).n, 7); // 2+9+1+1+1+9+9+2 = 34 → 7
+    expect(lifePath(DateTime(1960, 8, 18)).n, 33); // сумма 33 остаётся мастер-числом
+    expect(nameNumber('Анна', b).n, 5); // А1 Н6 Н6 А1 = 14 → 5
+    expect(personalYear(b, 2026).n, inInclusiveRange(1, 9));
+    expect(dayNumber(b, DateTime(2026, 11, 11)).n, inInclusiveRange(1, 9));
+    expect(genderize('Ты {способна|способен}', true), 'Ты способна');
+    expect(genderize('Ты {способна|способен}', false), 'Ты способен');
+    expect(genderize('Ты {способна|способен}', null), 'Ты способна (способен)');
+    expect(sphereText(7, 'money', '', easy: true), easy7Money);
+  });
+
+  testWidgets('экран нумерологии открывается на всех вкладках', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppState(Store(await SharedPreferences.getInstance()));
+    await app.store.saveProfile(anna);
+    await tester.pumpWidget(MaterialApp(home: NumerologyScreen(app: app)));
+    await tester.pumpAndSettle();
+    expect(find.text('8'), findsOneWidget);
+    for (final tab in ['Число имени', 'Число дня', 'Личный год', '💎 Совместимость', 'Моё число']) {
+      await tester.tap(find.text(tab));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('Деньги и карьера'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Восьмёрка'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
