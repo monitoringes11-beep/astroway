@@ -12,6 +12,7 @@ import 'dream.dart';
 import 'horoscope.dart';
 import 'numerology.dart';
 import 'omens.dart';
+import 'palm.dart';
 import 'sunmoon.dart';
 import 'onboarding.dart';
 
@@ -239,7 +240,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                _Tile('✋', 'Тайны ладони', () => _soon('Тайны ладони'), wide: true),
+                _Tile(
+                  '✋',
+                  'Тайны ладони',
+                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PalmScreen(app: app))),
+                  wide: true,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Приложение носит развлекательный характер. Не является рекомендацией для принятия важных решений.',

@@ -8,6 +8,8 @@ import 'package:astroway/logic/numerology.dart';
 import 'package:astroway/data/numerology_texts.dart';
 import 'package:astroway/data/omens.dart';
 import 'package:astroway/logic/sunmoon.dart';
+import 'package:astroway/data/palm.dart';
+import 'package:astroway/logic/svg_path.dart';
 import 'package:astroway/logic/profile.dart';
 import 'package:astroway/logic/zodiac.dart';
 import 'package:astroway/screens/home.dart';
@@ -19,6 +21,7 @@ import 'package:astroway/screens/horoscope.dart';
 import 'package:astroway/screens/numerology.dart';
 import 'package:astroway/screens/omens.dart';
 import 'package:astroway/screens/sunmoon.dart';
+import 'package:astroway/screens/palm.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -203,6 +206,37 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: SunMoonScreen(app: app)));
     expect(find.textContaining('твои Солнце и Луна'), findsOneWidget);
     expect(find.textContaining('СКОРПИОН'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('ладонь: данные и тип руки', () {
+    expect(palmLines.map((l) => l.id), ['life', 'heart', 'head', 'fate']);
+    expect(handTypes[handTypeKey(squarePalm: true, shortFingers: true)]![0], 'Земная рука');
+    expect(handTypes[handTypeKey(squarePalm: false, shortFingers: false)]![0], 'Водная рука');
+    for (final l in palmLines) {
+      expect(samplePath(parseSvgPath(l.path)).length, greaterThan(10));
+    }
+  });
+
+  testWidgets('экран ладони: схема и тип руки', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppState(Store(await SharedPreferences.getInstance()));
+    await app.store.saveProfile(anna);
+    await tester.pumpWidget(MaterialApp(home: PalmScreen(app: app)));
+    await tester.ensureVisible(find.text('Широкой дугой к центру ладони'));
+    await tester.tap(find.text('Широкой дугой к центру ладони'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Линия жизни: широкой дугой'), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, 3000));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Тип руки'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Квадратная, ширина ≈ длине'));
+    await tester.tap(find.text('Короче ладони'));
+    await tester.pumpAndSettle();
+    expect(find.text('Земная рука'), findsOneWidget);
+    await tester.tap(find.text('💎 По фото'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 }
