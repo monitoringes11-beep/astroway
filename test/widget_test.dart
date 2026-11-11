@@ -6,6 +6,7 @@ import 'package:astroway/logic/memory.dart';
 import 'package:astroway/logic/moon.dart';
 import 'package:astroway/logic/numerology.dart';
 import 'package:astroway/data/numerology_texts.dart';
+import 'package:astroway/data/omens.dart';
 import 'package:astroway/logic/profile.dart';
 import 'package:astroway/logic/zodiac.dart';
 import 'package:astroway/screens/home.dart';
@@ -15,6 +16,7 @@ import 'dart:io';
 import 'package:astroway/main.dart';
 import 'package:astroway/screens/horoscope.dart';
 import 'package:astroway/screens/numerology.dart';
+import 'package:astroway/screens/omens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -149,6 +151,36 @@ void main() {
     await tester.tap(find.text('Деньги и карьера'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Восьмёрка'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('знаки судьбы: поиск и знак дня', () {
+    expect(searchOmens('рассыпала соль').first.id, 'salt');
+    expect(searchOmens('птица стучала в окно').first.id, 'bird');
+    expect(searchOmens('чёрный кот перебежал дорогу').first.id, 'cat');
+    expect(searchOmens('', polarity: 'good').every((o) => o.polarity == 'good'), isTrue);
+    expect(searchOmens('', sphere: 'money').every((o) => o.spheres.contains('money')), isTrue);
+    expect(searchOmens('динозавр'), isEmpty);
+    for (final t in omenTasks) {
+      expect(omens.any((o) => o.id == t[2]), isTrue);
+    }
+  });
+
+  testWidgets('экран знаков судьбы', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppState(Store(await SharedPreferences.getInstance()));
+    await app.store.saveProfile(anna);
+    await tester.pumpWidget(MaterialApp(home: OmensScreen(app: app)));
+    await tester.tap(find.text('Встретила знак'));
+    await tester.pumpAndSettle();
+    expect(find.text('ЧТО ГОВОРИТ ПРИМЕТА'), findsOneWidget);
+    await tester.tap(find.text('Словарь'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'соль');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Рассыпать соль'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('традиция'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

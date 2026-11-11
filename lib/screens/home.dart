@@ -11,6 +11,7 @@ import '../theme.dart';
 import 'dream.dart';
 import 'horoscope.dart';
 import 'numerology.dart';
+import 'omens.dart';
 import 'onboarding.dart';
 
 enum Scene { morning, day, night }
@@ -218,7 +219,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => HoroscopeScreen(app: app))),
                     ),
                     _Tile('🃏', 'Расклады', () => _soon('Расклады')),
-                    _Tile('⭐', 'Знаки судьбы', () => _soon('Знаки судьбы')),
+                    _Tile(
+                      '⭐',
+                      'Знаки судьбы',
+                      () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OmensScreen(app: app))),
+                    ),
                     _Tile('🌗', 'Луна и Солнце', () => _soon('Луна и Солнце')),
                     _Tile(
                       '7',
