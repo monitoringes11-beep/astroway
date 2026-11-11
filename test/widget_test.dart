@@ -1,3 +1,4 @@
+import 'package:astroway/data/forecast_bank.dart';
 import 'package:astroway/data/dream_base.dart';
 import 'package:astroway/logic/daily.dart';
 import 'package:astroway/logic/horoscope.dart';
@@ -73,6 +74,43 @@ void main() {
     expect(a.love, b.love);
     expect(a.avoid[0] == a.avoid[1], isFalse);
     expect(a.prepare[0] == a.prepare[1], isFalse);
+  });
+
+  test('прогноз дня зависит от стихии, времени рождения и пола', () {
+    final d = DateTime(2026, 11, 12, 9);
+    final leo = Profile(name: 'Анна', gender: Gender.female, birthday: DateTime(1990, 8, 1), birthSlot: '21–24');
+    final a = forecastFor(anna, d, easy: false);
+    final l = forecastFor(leo, d, easy: false);
+    expect(loveByElement[2].any(a.love.startsWith), isTrue); // Скорпион, вода
+    expect(loveByElement[3].any(l.love.startsWith), isTrue); // Лев, огонь
+    expect(timingBySlot[0], contains(a.timing));
+    expect(timingBySlot[2], contains(l.timing));
+    expect(a.theme, contains('число'));
+    expect(a.memory, isNull);
+    // За год ни одной незаменённой метки пола и ни одного повтора внутри блока.
+    final man = Profile(name: 'Олег', gender: Gender.male, birthday: DateTime(1985, 3, 30), birthSlot: slotUnknown);
+    final loves = <String>{};
+    for (var i = 0; i < 365; i++) {
+      for (final p in [anna, leo, man]) {
+        final f = forecastFor(p, d.add(Duration(days: i)), easy: p != anna && i.isEven);
+        final all = [f.love, f.work, f.mood, f.timing, ...f.avoid, ...f.prepare].join(' ');
+        expect(all.contains('{'), isFalse, reason: all);
+        expect(f.avoid[0] == f.avoid[1], isFalse);
+        expect(f.prepare[0] == f.prepare[1], isFalse);
+        if (p == anna) loves.add([f.love, f.work, f.mood, f.timing, ...f.avoid, ...f.prepare].join());
+      }
+    }
+    expect(loves.length, 365); // целиком прогноз за год не повторяется ни разу
+  });
+
+  test('прогноз вспоминает ответ волшебнице за последние две недели', () {
+    final d = DateTime(2026, 11, 12, 9);
+    final fresh = WitchAnswer(DateTime(2026, 11, 10), ['Вода'], 'думаю о переезде', 'dream');
+    final old = WitchAnswer(DateTime(2026, 9, 1), ['Вода'], 'думаю о переезде', 'dream');
+    final f = forecastFor(anna, d, easy: false, recall: fresh);
+    expect(f.memory, contains('думаю о переезде'));
+    expect(f.memory, contains('«вода»'));
+    expect(forecastFor(anna, d, easy: false, recall: old).memory, isNull);
   });
 
   test('сонник находит символы', () {

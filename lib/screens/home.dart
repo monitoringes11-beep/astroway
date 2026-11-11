@@ -69,7 +69,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final age = p.ageOn(_now);
     final easy = app.easy;
     final energy = sunEnergyFor(_now);
-    final f = forecastFor(p, _now, easy: easy);
+    final mem = app.memory.all();
+    final f = forecastFor(p, _now, easy: easy, recall: mem.isEmpty ? null : mem.last);
     final img = 'assets/images/witch-${scene.name}.jpg';
 
     return Scaffold(
@@ -184,9 +185,15 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
+                      Text(
+                        f.theme,
+                        style: const TextStyle(color: AW.gold, fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
                       _Line('Что принесёт день', '💞 ${f.love}\n💼 ${f.work}\n✨ ${f.mood}'),
+                      _Line('Лучшее время', '🕰 ${f.timing}'),
                       _Line('Чего сторониться', f.avoid.map((e) => '• $e').join('\n')),
                       _Line('К чему готовиться', f.prepare.map((e) => '• $e').join('\n')),
+                      if (f.memory != null) _Line('Волшебница помнит', '🔮 ${f.memory}'),
                       if (p.birthSlot == slotUnknown)
                         const Padding(
                           padding: EdgeInsets.only(top: 8),

@@ -1,4 +1,7 @@
+import '../data/forecast_bank.dart';
+import 'memory.dart';
 import 'moon.dart';
+import 'numerology.dart';
 import 'profile.dart';
 import 'zodiac.dart';
 
@@ -18,62 +21,70 @@ String dayKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${
 
 String _easy(String s, String emoji) => '${s.replaceAll(RegExp(r'\.$'), '')} $emoji';
 
-const _love = [
-  'Тёплый разговор сблизит с любимым человеком.',
-  'Одинокие могут встретить интересного человека в обычном месте.',
-  'Партнёр оценит твоё внимание и заботу.',
-  'Старые обиды лучше отпустить, они мешают двигаться дальше.',
-];
-const _work = [
-  'Удачный день для переговоров и новых договорённостей.',
-  'Дела пойдут быстрее, если начать с самого сложного.',
-  'Коллеги поддержат твою идею, не бойся её предложить.',
-  'Хорошо подвести итоги и навести порядок в бумагах.',
-];
-const _mood = [
-  'Настроение ровное, силы на всё хватит.',
-  'Возможна лёгкая усталость, береги себя.',
-  'Вдохновение придёт неожиданно, запиши идеи.',
-  'День подходит для отдыха и тихих радостей.',
-];
-const _avoid = [
-  'Поспешных решений в денежных делах.',
-  'Споров с близкими из-за мелочей.',
-  'Обещаний, которые трудно выполнить.',
-  'Лишних трат на импульсе.',
-  'Сплетен и чужих тайн.',
-  'Переутомления к вечеру.',
-];
-const _prepare = [
-  'К неожиданной новости, она может быть приятной.',
-  'К разговору, которого давно ждал.',
-  'К предложению, над которым стоит подумать.',
-  'К встрече со старым знакомым.',
-  'К небольшим переменам в планах.',
-  'К приятной покупке или подарку.',
-];
-
 class DayForecast {
-  final String love, work, mood;
+  final String theme, love, work, mood, timing;
   final List<String> avoid, prepare;
-  const DayForecast(this.love, this.work, this.mood, this.avoid, this.prepare);
+  final String? memory;
+  const DayForecast({
+    required this.theme,
+    required this.love,
+    required this.work,
+    required this.mood,
+    required this.timing,
+    required this.avoid,
+    required this.prepare,
+    this.memory,
+  });
 }
 
-DayForecast forecastFor(Profile p, DateTime date, {required bool easy}) {
-  final sign = signOf(p.birthday).name;
-  final k = '${p.name}|$sign|${p.birthSlot}|${dayKey(date)}';
-  String t(List<String> l, String salt, String emoji) {
-    final s = pick(l, k + salt);
+/// Группа времени рождения: 0 утро, 1 день, 2 вечер, 3 ночь, 4 не указано.
+int slotGroup(String slot) {
+  final i = birthSlots.indexOf(slot);
+  return i < 0 ? 4 : i ~/ 2;
+}
+
+int elementOf(DateTime birthday) => signs.indexOf(signOf(birthday)) % 4;
+
+/// Личный прогноз дня. Всё считается на телефоне, без интернета:
+/// стихия знака и время рождения задают смысл фраз, Луна, Солнце и число дня
+/// дают оттенок дня, а имя и дата перемешивают выбор, чтобы у всех было по-своему.
+DayForecast forecastFor(Profile p, DateTime date, {required bool easy, WitchAnswer? recall}) {
+  final el = elementOf(p.birthday);
+  final slot = slotGroup(p.birthSlot);
+  final moon = moonFor(date).phase.index;
+  final sun = sunEnergyFor(date).index;
+  final num = dayNumber(p.birthday, date).n;
+  final female = switch (p.gender) {
+    Gender.female => true,
+    Gender.male => false,
+    Gender.unspecified => null,
+  };
+  final k = '${p.name}|${p.birthday.toIso8601String().substring(0, 10)}|${p.birthSlot}|${dayKey(date)}';
+  String g(String s) => genderize(s, female);
+  String two(String a, String b, String emoji) {
+    final s = g('$a $b');
     return easy ? _easy(s, emoji) : s;
   }
 
-  final a1 = pick(_avoid, '${k}a1');
-  var a2 = pick(_avoid, '${k}a2');
-  if (a2 == a1) a2 = _avoid[(_avoid.indexOf(a1) + 1) % _avoid.length];
-  final p1 = pick(_prepare, '${k}p1');
-  var p2 = pick(_prepare, '${k}p2');
-  if (p2 == p1) p2 = _prepare[(_prepare.indexOf(p1) + 1) % _prepare.length];
-  return DayForecast(t(_love, 'l', '💞'), t(_work, 'w', '💼'), t(_mood, 'm', '✨'), [a1, a2], [p1, p2]);
+  final avoid1 = stableHash('${k}a') % 2 == 0 ? pick(avoidByMoon[moon], '${k}am') : pick(avoidByElement[el], '${k}ae');
+  final prep1 = pick(prepareByDay[num], '${k}pd');
+  String? memory;
+  if (recall != null && date.difference(recall.date).inDays <= 14 && recall.answer.trim().isNotEmpty) {
+    final a = recall.answer.trim();
+    final short = a.length > 80 ? '${a.substring(0, 80).trimRight()}…' : a;
+    final sym = recall.symbols.isEmpty ? 'знак' : recall.symbols.first.toLowerCase();
+    memory = g(pick(memoryHints, '${k}mem').replaceAll('{s}', sym).replaceAll('{a}', short));
+  }
+  return DayForecast(
+    theme: '${pick(dayTheme[num], '${k}th')} · число $num',
+    love: two(pick(loveByElement[el], '${k}le'), pick(loveByMoon[moon], '${k}lm'), '💞'),
+    work: two(pick(workByElement[el], '${k}we'), pick(workByDay[num], '${k}wd'), '💼'),
+    mood: two(pick(moodBySun[sun], '${k}ms'), pick(moodBySlot[slot], '${k}mt'), '✨'),
+    timing: g(pick(timingBySlot[slot], '${k}ti')),
+    avoid: [g(avoid1), g(pick(avoidCommon, '${k}ac'))],
+    prepare: [g(prep1), g(pick(prepareCommon, '${k}pc'))],
+    memory: memory,
+  );
 }
 
 // ===== Солнце и Луна =====
