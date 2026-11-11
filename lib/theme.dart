@@ -71,6 +71,8 @@ class Label extends StatelessWidget {
   final Color color;
   const Label(this.text, {super.key, this.color = AW.gold});
   @override
-  Widget build(BuildContext context) => Text(text.toUpperCase(),
-      style: TextStyle(color: color, fontSize: 11.5, letterSpacing: 0.8, fontWeight: FontWeight.w600));
+  Widget build(BuildContext context) => Text(
+    text.toUpperCase(),
+    style: TextStyle(color: color, fontSize: 11.5, letterSpacing: 0.8, fontWeight: FontWeight.w600),
+  );
 }

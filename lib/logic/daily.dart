@@ -14,8 +14,7 @@ int stableHash(String s) {
 
 T pick<T>(List<T> list, String key) => list[stableHash(key) % list.length];
 
-String dayKey(DateTime d) =>
-    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+String dayKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
 String _easy(String s, String emoji) => '${s.replaceAll(RegExp(r'\.$'), '')} $emoji';
 
@@ -74,13 +73,7 @@ DayForecast forecastFor(Profile p, DateTime date, {required bool easy}) {
   final p1 = pick(_prepare, '${k}p1');
   var p2 = pick(_prepare, '${k}p2');
   if (p2 == p1) p2 = _prepare[(_prepare.indexOf(p1) + 1) % _prepare.length];
-  return DayForecast(
-    t(_love, 'l', '💞'),
-    t(_work, 'w', '💼'),
-    t(_mood, 'm', '✨'),
-    [a1, a2],
-    [p1, p2],
-  );
+  return DayForecast(t(_love, 'l', '💞'), t(_work, 'w', '💼'), t(_mood, 'm', '✨'), [a1, a2], [p1, p2]);
 }
 
 // ===== Солнце и Луна =====
@@ -89,10 +82,10 @@ enum SunEnergy { high, mid, low }
 SunEnergy sunEnergyFor(DateTime d) => SunEnergy.values[stableHash('${dayKey(d)}sun') % 3];
 
 String sunLevel(SunEnergy e) => switch (e) {
-      SunEnergy.high => '☀️ Высокая',
-      SunEnergy.mid => '🌤 Ровная',
-      SunEnergy.low => '⛅ Мягкая',
-    };
+  SunEnergy.high => '☀️ Высокая',
+  SunEnergy.mid => '🌤 Ровная',
+  SunEnergy.low => '⛅ Мягкая',
+};
 
 const _sunText = {
   SunEnergy.high: [
@@ -112,11 +105,11 @@ const _sunText = {
 String sunText(SunEnergy e, {required bool easy}) => _sunText[e]![easy ? 1 : 0];
 
 String moonLevel(MoonPhase p) => switch (p) {
-      MoonPhase.newMoon => '🌑 Луна скрыта',
-      MoonPhase.young => '🌒 Растущая Луна',
-      MoonPhase.full => '🌕 Полнолуние',
-      MoonPhase.old => '🌘 Убывающая Луна',
-    };
+  MoonPhase.newMoon => '🌑 Луна скрыта',
+  MoonPhase.young => '🌒 Растущая Луна',
+  MoonPhase.full => '🌕 Полнолуние',
+  MoonPhase.old => '🌘 Убывающая Луна',
+};
 
 const _moonText = {
   MoonPhase.newMoon: [

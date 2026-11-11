@@ -1,3 +1,5 @@
+import '../data/dream_base.dart';
+
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -51,7 +53,9 @@ class _DreamScreenState extends State<DreamScreen> {
       }),
     );
     if (!ok) {
-      setState(() => _voiceError = 'Нет доступа к микрофону. Разреши его в настройках телефона или напиши сон текстом.');
+      setState(
+        () => _voiceError = 'Нет доступа к микрофону. Разреши его в настройках телефона или напиши сон текстом.',
+      );
       return;
     }
     setState(() {
@@ -77,6 +81,7 @@ class _DreamScreenState extends State<DreamScreen> {
       _answer.clear();
       _saved = false;
     });
+    if (_reading!.symbols.isEmpty) DreamBase.logMissed(text);
   }
 
   Future<void> _saveAnswer() async {
@@ -122,7 +127,11 @@ class _DreamScreenState extends State<DreamScreen> {
                       if (_listening) BoxShadow(color: AW.gold.withValues(alpha: 0.6), blurRadius: 30, spreadRadius: 6),
                     ],
                   ),
-                  child: Icon(_listening ? Icons.stop_rounded : Icons.mic_rounded, size: 44, color: const Color(0xFF1D1504)),
+                  child: Icon(
+                    _listening ? Icons.stop_rounded : Icons.mic_rounded,
+                    size: 44,
+                    color: const Color(0xFF1D1504),
+                  ),
                 ),
               ),
             ),
@@ -154,67 +163,94 @@ class _DreamScreenState extends State<DreamScreen> {
           if (r != null) ...[
             const SizedBox(height: 18),
             GlassCard(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Толкование волшебницы',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AW.gold)),
-                const SizedBox(height: 6),
-                Text('«${r.text}»', style: const TextStyle(fontStyle: FontStyle.italic, color: AW.soft)),
-                const Divider(height: 24),
-                if (r.symbols.isEmpty)
-                  const Text('Этого символа пока нет в нашей базе сонников. Волшебница не будет придумывать: '
-                      'попробуй описать главный образ сна другими словами.'),
-                for (final s in r.symbols) ...[
-                  Text(s.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  const Label('Классический сонник'),
-                  Text(s.classic, style: const TextStyle(height: 1.4)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Толкование волшебницы',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AW.gold),
+                  ),
                   const SizedBox(height: 6),
-                  const Label('Народные приметы'),
-                  Text(s.folk, style: const TextStyle(height: 1.4)),
-                  const SizedBox(height: 14),
-                ],
-                if (r.memoryLine != null)
+                  Text(
+                    '«${r.text}»',
+                    style: const TextStyle(fontStyle: FontStyle.italic, color: AW.soft),
+                  ),
+                  const Divider(height: 24),
+                  if (r.symbols.isEmpty)
+                    const Text(
+                      'Этого образа пока нет в нашей базе сонников. Волшебница не будет придумывать: '
+                      'попробуй назвать главный образ сна другим словом (например, «дождь», «река», «дом»). '
+                      'Мы записали этот сон и добавим символ в базу.',
+                    ),
+                  for (final s in r.symbols) ...[
+                    Text(s.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Label('Классический сонник · ${s.source}'),
+                    Text(s.classic, style: const TextStyle(height: 1.4)),
+                    if (s.folk != null) ...[
+                      const SizedBox(height: 6),
+                      const Label('Народные приметы'),
+                      Text(s.folk!, style: const TextStyle(height: 1.4)),
+                    ],
+                    const SizedBox(height: 14),
+                  ],
+                  if (r.memoryLine != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AW.gold.withValues(alpha: 0.13),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text('🔮 ${r.memoryLine}', style: const TextStyle(height: 1.4)),
+                    ),
+                  Text(r.personal, style: const TextStyle(height: 1.4)),
+                  const SizedBox(height: 10),
+                  const Text(sourcesNote, style: TextStyle(color: AW.soft, fontSize: 12.5)),
+                  const SizedBox(height: 10),
+                  const Text(
+                    signoff,
+                    style: TextStyle(color: AW.gold, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
                   Container(
-                    margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                        color: AW.gold.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(12)),
-                    child: Text('🔮 ${r.memoryLine}', style: const TextStyle(height: 1.4)),
-                  ),
-                Text(r.personal, style: const TextStyle(height: 1.4)),
-                const SizedBox(height: 10),
-                const Text(sourcesNote, style: TextStyle(color: AW.soft, fontSize: 12.5)),
-                const SizedBox(height: 10),
-                const Text(signoff, style: TextStyle(color: AW.gold, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0x1AA0BEFF),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0x4DA0BEFF)),
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('🔮 Вопрос волшебницы', style: TextStyle(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text(r.witchQuestion),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _answer,
-                      minLines: 2,
-                      maxLines: 4,
-                      decoration: const InputDecoration(hintText: 'Ответь своими словами, волшебница запомнит'),
+                      color: const Color(0x1AA0BEFF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0x4DA0BEFF)),
                     ),
-                    const SizedBox(height: 8),
-                    FilledButton(onPressed: _saved ? null : _saveAnswer, child: Text(_saved ? 'Запомнила ✓' : 'Запомнить ответ')),
-                    if (_saved)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: Text('Учту это в следующих толкованиях и прогнозах.', style: TextStyle(color: AW.soft)),
-                      ),
-                  ]),
-                ),
-              ]),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('🔮 Вопрос волшебницы', style: TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
+                        Text(r.witchQuestion),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _answer,
+                          minLines: 2,
+                          maxLines: 4,
+                          decoration: const InputDecoration(hintText: 'Ответь своими словами, волшебница запомнит'),
+                        ),
+                        const SizedBox(height: 8),
+                        FilledButton(
+                          onPressed: _saved ? null : _saveAnswer,
+                          child: Text(_saved ? 'Запомнила ✓' : 'Запомнить ответ'),
+                        ),
+                        if (_saved)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 6),
+                            child: Text(
+                              'Учту это в следующих толкованиях и прогнозах.',
+                              style: TextStyle(color: AW.soft),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],

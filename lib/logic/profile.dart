@@ -5,9 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum Gender { female, male, unspecified }
 
 /// Интервалы времени рождения: 8 по 3 часа или «не помню».
-const List<String> birthSlots = [
-  '06–09', '09–12', '12–15', '15–18', '18–21', '21–24', '00–03', '03–06',
-];
+const List<String> birthSlots = ['06–09', '09–12', '12–15', '15–18', '18–21', '21–24', '00–03', '03–06'];
 const String slotUnknown = 'unknown';
 
 class Profile {
@@ -16,38 +14,31 @@ class Profile {
   final DateTime birthday;
   final String birthSlot; // один из birthSlots или slotUnknown
 
-  const Profile({
-    required this.name,
-    required this.gender,
-    required this.birthday,
-    required this.birthSlot,
-  });
+  const Profile({required this.name, required this.gender, required this.birthday, required this.birthSlot});
 
   bool get isFemale => gender != Gender.male;
 
   int ageOn(DateTime now) {
     var age = now.year - birthday.year;
-    if (now.month < birthday.month ||
-        (now.month == birthday.month && now.day < birthday.day)) {
+    if (now.month < birthday.month || (now.month == birthday.month && now.day < birthday.day)) {
       age--;
     }
     return age;
   }
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'gender': gender.name,
-        'birthday': birthday.toIso8601String().substring(0, 10),
-        'birthSlot': birthSlot,
-      };
+    'name': name,
+    'gender': gender.name,
+    'birthday': birthday.toIso8601String().substring(0, 10),
+    'birthSlot': birthSlot,
+  };
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
-        name: j['name'] as String,
-        gender: Gender.values.firstWhere((g) => g.name == j['gender'],
-            orElse: () => Gender.unspecified),
-        birthday: DateTime.parse(j['birthday'] as String),
-        birthSlot: j['birthSlot'] as String? ?? slotUnknown,
-      );
+    name: j['name'] as String,
+    gender: Gender.values.firstWhere((g) => g.name == j['gender'], orElse: () => Gender.unspecified),
+    birthday: DateTime.parse(j['birthday'] as String),
+    birthSlot: j['birthSlot'] as String? ?? slotUnknown,
+  );
 }
 
 String yearsWord(int n) {

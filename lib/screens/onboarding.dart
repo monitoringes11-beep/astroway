@@ -44,12 +44,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _save() async {
-    final p = Profile(
-      name: _name.text.trim(),
-      gender: _gender,
-      birthday: _birthday!,
-      birthSlot: _slot,
-    );
+    final p = Profile(name: _name.text.trim(), gender: _gender, birthday: _birthday!, birthSlot: _slot);
     await widget.app.saveProfile(p);
     if (mounted && widget.initial != null) Navigator.of(context).pop();
   }
@@ -66,7 +61,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
           children: [
             if (widget.initial == null) ...[
-              const Text('AstroWay', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700, color: AW.gold)),
+              const Text(
+                'AstroWay',
+                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700, color: AW.gold),
+              ),
               const SizedBox(height: 6),
               const Text('Сонник, гороскоп, расклады', style: TextStyle(color: AW.soft, fontSize: 16)),
               const SizedBox(height: 24),
@@ -98,14 +96,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             OutlinedButton(
               style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
               onPressed: _pickDate,
-              child: Text(b == null
-                  ? 'Выбрать дату'
-                  : '${b.day.toString().padLeft(2, '0')}.${b.month.toString().padLeft(2, '0')}.${b.year}'),
+              child: Text(
+                b == null
+                    ? 'Выбрать дату'
+                    : '${b.day.toString().padLeft(2, '0')}.${b.month.toString().padLeft(2, '0')}.${b.year}',
+              ),
             ),
             if (b != null) ...[
               const SizedBox(height: 8),
-              Text('${signOf(b).symbol} ${signOf(b).name} · $age ${yearsWord(age!)}',
-                  style: const TextStyle(color: AW.gold)),
+              Text(
+                '${signOf(b).symbol} ${signOf(b).name} · $age ${yearsWord(age!)}',
+                style: const TextStyle(color: AW.gold),
+              ),
               if (!_oldEnough)
                 const Padding(
                   padding: EdgeInsets.only(top: 6),
@@ -122,9 +124,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 for (final s in birthSlots)
                   ChoiceChip(label: Text(s), selected: _slot == s, onSelected: (_) => setState(() => _slot = s)),
                 ChoiceChip(
-                    label: const Text('Не помню'),
-                    selected: _slot == slotUnknown,
-                    onSelected: (_) => setState(() => _slot = slotUnknown)),
+                  label: const Text('Не помню'),
+                  selected: _slot == slotUnknown,
+                  onSelected: (_) => setState(() => _slot = slotUnknown),
+                ),
               ],
             ),
             const SizedBox(height: 18),

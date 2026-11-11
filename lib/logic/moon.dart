@@ -12,18 +12,18 @@ class MoonInfo {
   const MoonInfo(this.age, this.illumination, this.phase, this.lunarDay);
 
   String get name => switch (phase) {
-        MoonPhase.newMoon => 'Новолуние',
-        MoonPhase.young => 'Молодая Луна',
-        MoonPhase.full => 'Полнолуние',
-        MoonPhase.old => 'Старая Луна',
-      };
+    MoonPhase.newMoon => 'Новолуние',
+    MoonPhase.young => 'Молодая Луна',
+    MoonPhase.full => 'Полнолуние',
+    MoonPhase.old => 'Старая Луна',
+  };
 
   String get tip => switch (phase) {
-        MoonPhase.newMoon => 'Время загадывать желания и задумывать новое.',
-        MoonPhase.young => 'Луна растёт: хорошо начинать дела и притягивать.',
-        MoonPhase.full => 'Пик силы: эмоции яркие, сны самые сильные.',
-        MoonPhase.old => 'Луна убывает: время отпускать и завершать.',
-      };
+    MoonPhase.newMoon => 'Время загадывать желания и задумывать новое.',
+    MoonPhase.young => 'Луна растёт: хорошо начинать дела и притягивать.',
+    MoonPhase.full => 'Пик силы: эмоции яркие, сны самые сильные.',
+    MoonPhase.old => 'Луна убывает: время отпускать и завершать.',
+  };
 
   int get percent => (illumination * 100).round();
 }

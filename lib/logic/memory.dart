@@ -11,19 +11,14 @@ class WitchAnswer {
 
   const WitchAnswer(this.date, this.symbols, this.answer, this.type);
 
-  Map<String, dynamic> toJson() => {
-        'date': date.toIso8601String(),
-        'symbols': symbols,
-        'answer': answer,
-        'type': type,
-      };
+  Map<String, dynamic> toJson() => {'date': date.toIso8601String(), 'symbols': symbols, 'answer': answer, 'type': type};
 
   factory WitchAnswer.fromJson(Map<String, dynamic> j) => WitchAnswer(
-        DateTime.parse(j['date'] as String),
-        (j['symbols'] as List).cast<String>(),
-        j['answer'] as String,
-        j['type'] as String? ?? 'dream',
-      );
+    DateTime.parse(j['date'] as String),
+    (j['symbols'] as List).cast<String>(),
+    j['answer'] as String,
+    j['type'] as String? ?? 'dream',
+  );
 }
 
 class WitchMemory {
@@ -36,9 +31,7 @@ class WitchMemory {
     final raw = prefs.getString(_key);
     if (raw == null) return [];
     try {
-      return (jsonDecode(raw) as List)
-          .map((e) => WitchAnswer.fromJson(e as Map<String, dynamic>))
-          .toList();
+      return (jsonDecode(raw) as List).map((e) => WitchAnswer.fromJson(e as Map<String, dynamic>)).toList();
     } catch (_) {
       return [];
     }

@@ -1,3 +1,5 @@
+import 'data/dream_base.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -9,6 +11,7 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await DreamBase.loadAsset();
   final store = await Store.open();
   runApp(AstroWayApp(store: store));
 }
@@ -73,8 +76,7 @@ class _AstroWayAppState extends State<AstroWayApp> {
         ],
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(
-                MediaQuery.of(context).textScaler.scale(14) / 14 * (app.large ? 1.18 : 1.0)),
+            textScaler: TextScaler.linear(MediaQuery.of(context).textScaler.scale(14) / 14 * (app.large ? 1.18 : 1.0)),
           ),
           child: child!,
         ),

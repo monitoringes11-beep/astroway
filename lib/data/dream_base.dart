@@ -1,59 +1,76 @@
-/// Символы сонника. Классические толкования (Миллер 1901, старые русские сонники)
-/// и народные приметы пересказаны своими словами. Это стартовая база для MVP.
+import 'dart:convert';
+
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// Символ сонника. Толкования пересказаны по-русски по соннику Миллера (1901,
+/// общественное достояние); у части символов есть народные приметы.
 class DreamSymbol {
   final String name;
-  final RegExp pattern;
+  final List<String> keys;
   final String classic;
-  final String folk;
-  const DreamSymbol(this.name, this.pattern, this.classic, this.folk);
+  final String? folk;
+  final String source;
+  const DreamSymbol(this.name, this.keys, this.classic, this.folk, this.source);
+
+  factory DreamSymbol.fromJson(Map<String, dynamic> j) => DreamSymbol(
+    j['ru'] as String,
+    (j['k'] as List).cast<String>(),
+    j['t'] as String,
+    j['f'] as String?,
+    (j['src'] as String?) ?? 'Миллер, 1901',
+  );
 }
 
-final List<DreamSymbol> dreamBase = [
-  DreamSymbol('Вода', RegExp(r'вод|мор[еяю]|рек|озер'),
-      'Чистая вода в снах обычно означает ясность и спокойствие, мутная предупреждает о тревогах и неясных делах.',
-      'Чистую воду пить во сне к здоровью, а переходить реку вброд к преодолению преграды.'),
-  DreamSymbol('Змея', RegExp(r'зме'),
-      'Змея говорит о скрытом недоброжелателе рядом или о переменах и мудрости. Победить змею во сне означает справиться с трудностью.',
-      'Змея в доме снится к сплетням, а змея, которая уползает, к избавлению от беды.'),
-  DreamSymbol('Зубы', RegExp(r'зуб'),
-      'Выпадающие зубы связаны с беспокойством о близких. Ровные белые зубы обещают благополучие.',
-      'Новый зуб вырос во сне к прибавлению в семье, а зуб без крови выпал к мелким хлопотам.'),
-  DreamSymbol('Кошка', RegExp(r'кош|кот'),
-      'Кошка указывает на хитрость и лесть в окружении: кто-то говорит приятное не от души.',
-      'Чёрная кошка снится к ссоре, белая к лукавому другу, а прогнать кошку значит разоблачить обман.'),
-  DreamSymbol('Собака', RegExp(r'собак|п[её]с'),
-      'Собака означает друга и верность. Злая собака предупреждает о ссоре с близким человеком.',
-      'Белая собака снится к другу, чёрная к недоброй вести, а ласковая к подарку.'),
-  DreamSymbol('Дом', RegExp(r'дом'),
-      'Дом отражает твоё внутреннее состояние. Новый или светлый дом говорит о переменах к лучшему.',
-      'Строить дом во сне к долгой жизни, переезжать в новый дом к переменам к лучшему.'),
-  DreamSymbol('Деньги', RegExp(r'деньг|монет|купюр'),
-      'Найти деньги во сне означает неожиданную прибыль или новые хлопоты. Потерять говорит о мелких потерях, которых легко избежать.',
-      'Медные монеты снятся к слезам и пустым хлопотам, серебро и бумажные деньги к прибыли.'),
-  DreamSymbol('Полёт', RegExp(r'лета|летал|пол[её]т'),
-      'Летать во сне означает свободу, рост и исполнение желаний. Чем легче полёт, тем ближе задуманное.',
-      'Летать высоко снится к повышению и исполнению желаний, низко над землёй к мелким заботам.'),
-  DreamSymbol('Падение', RegExp(r'пада|упал|паден'),
-      'Падение отражает страх потерять контроль. Сон советует опереться на близких и не торопиться.',
-      'Упасть и подняться во сне значит выйти из трудности с честью.'),
-  DreamSymbol('Свадьба', RegExp(r'свадьб|венча'),
-      'Свадьба во сне говорит о переменах в жизни и новых обязательствах.',
-      'Чужая свадьба снится к приглашению и хорошей вести.'),
-  DreamSymbol('Ребёнок', RegExp(r'реб[её]н|младен|малыш'),
-      'Ребёнок означает новое начало, идею или заботу, которая скоро появится.',
-      'Держать на руках малыша снится к заботам, которые обернутся радостью.'),
-  DreamSymbol('Огонь', RegExp(r'огон|огн|пожар|свеч'),
-      'Огонь говорит о страсти и сильных чувствах. Пожар предупреждает о бурных событиях.',
-      'Ровный огонь в печи к достатку в доме, пожар без дыма к хорошим вестям.'),
-  DreamSymbol('Рыба', RegExp(r'рыб'),
-      'Рыба во сне к прибыли и удачным делам.',
-      'Ловить рыбу снится к прибыли, крупная рыба к большой удаче.'),
-  DreamSymbol('Машина', RegExp(r'машин|авто'),
-      'Машина показывает, куда движется твоя жизнь. Сидеть за рулём означает держать всё под контролем.',
-      'Сесть в чужую машину снится к помощи от людей, сломанная машина к задержке в делах.'),
-];
+/// База символов, загружается из assets/dreams_ru.json.
+class DreamBase {
+  static List<DreamSymbol> symbols = [];
+  static const asset = 'assets/dreams_ru.json';
+  static const _missedKey = 'astroway-missed-dreams';
 
-List<DreamSymbol> findSymbols(String text) {
-  final low = text.toLowerCase();
-  return dreamBase.where((s) => s.pattern.hasMatch(low)).toList();
+  static Future<void> loadAsset() async => load(await rootBundle.loadString(asset));
+
+  static void load(String json) {
+    symbols = (jsonDecode(json) as List).map((e) => DreamSymbol.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Запоминаем на устройстве сны, для которых не нашлось символа,
+  /// чтобы пополнять базу в первую очередь этими словами.
+  static Future<void> logMissed(String text) async {
+    final p = await SharedPreferences.getInstance();
+    final list = p.getStringList(_missedKey) ?? [];
+    list.add(text);
+    await p.setStringList(_missedKey, list.length > 100 ? list.sublist(list.length - 100) : list);
+  }
+
+  static Future<List<String>> missed() async => (await SharedPreferences.getInstance()).getStringList(_missedKey) ?? [];
+}
+
+String _norm(String s) => s.toLowerCase().replaceAll('ё', 'е');
+
+/// Ищет символы в тексте сна. Ключ с «=» на конце означает точную форму слова,
+/// без «=» это основа (начало слова). Для каждого слова берётся самое длинное
+/// совпадение, чтобы «лестница» не путалась с «лесом».
+List<DreamSymbol> findSymbols(String text, {int limit = 5}) {
+  final words = RegExp(r'[а-яa-z]+').allMatches(_norm(text)).map((m) => m[0]!);
+  final found = <DreamSymbol>[];
+  for (final w in words) {
+    if (w.length < 2) continue;
+    DreamSymbol? best;
+    var bestLen = 0;
+    for (final s in DreamBase.symbols) {
+      for (final k in s.keys) {
+        final exact = k.endsWith('=');
+        final stem = exact ? k.substring(0, k.length - 1) : k;
+        final ok = exact ? w == stem : w.startsWith(stem);
+        if (ok && stem.length > bestLen) {
+          best = s;
+          bestLen = stem.length;
+        }
+      }
+    }
+    if (best != null && !found.contains(best)) found.add(best);
+    if (found.length >= limit) break;
+  }
+  return found;
 }

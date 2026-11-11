@@ -6,10 +6,15 @@ import 'package:astroway/logic/moon.dart';
 import 'package:astroway/logic/profile.dart';
 import 'package:astroway/logic/zodiac.dart';
 import 'package:astroway/screens/home.dart';
+
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUpAll(() => DreamBase.load(File('assets/dreams_ru.json').readAsStringSync()));
+
   final anna = Profile(name: 'Анна', gender: Gender.female, birthday: DateTime(1990, 11, 5), birthSlot: '09–12');
 
   test('знак зодиака по дате', () {
@@ -52,8 +57,16 @@ void main() {
   });
 
   test('сонник находит символы', () {
-    expect(findSymbols('Я летала над морем и нашла монеты').map((s) => s.name), containsAll(['Вода', 'Деньги', 'Полёт']));
-    expect(findSymbols('ничего похожего'), isEmpty);
+    names(String t) => findSymbols(t).map((s) => s.name).toList();
+    expect(names('Я летала над морем и нашла монеты'), containsAll(['Море', 'Деньги', 'Полёт']));
+    expect(names('Приснился дождь'), ['Дождь']);
+    expect(names('Дождь'), ['Дождь']);
+    expect(names('шёл сильный ливень'), ['Дождь']);
+    expect(names('поднималась по лестнице в лесу'), containsAll(['Лестница', 'Лес']));
+    expect(names('чёрный кот который сидел'), ['Кошка']);
+    expect(names('левый берег'), isEmpty);
+    expect(names('ничего похожего'), isEmpty);
+    expect(DreamBase.symbols.length, greaterThan(150));
   });
 
   test('волшебница помнит ответ', () async {
@@ -62,7 +75,7 @@ void main() {
     final now = DateTime(2026, 11, 11);
     expect(interpretDream('вода', anna, now, mem).memoryLine, isNull);
     await mem.add(WitchAnswer(now, ['Вода'], 'переезд', 'dream'));
-    final r = interpretDream('плавала в море', anna, now, mem);
+    final r = interpretDream('пила чистую воду', anna, now, mem);
     expect(r.memoryLine, contains('связала образ «Вода»'));
     expect(r.memoryLine, contains('переезд'));
     expect(r.witchQuestion, contains('Вода'));
