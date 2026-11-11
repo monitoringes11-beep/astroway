@@ -1,0 +1,53 @@
+name: Сборка APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build apk --release
+
+      - name: Переименовать файл
+        run: cp build/app/outputs/flutter-apk/app-release.apk AstroWay-test.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AstroWay-test
+          path: AstroWay-test.apk
+
+      - name: Обновить тестовую сборку в Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete test-build --yes --cleanup-tag || true
+          gh release create test-build AstroWay-test.apk \
+            --prerelease \
+            --title "Тестовая сборка AstroWay" \
+            --notes "Сборка для проверки на телефоне. Коммит: ${GITHUB_SHA::7}. Скачай AstroWay-test.apk и установи (разреши установку из неизвестных источников)."
