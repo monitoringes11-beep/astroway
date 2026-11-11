@@ -10,11 +10,13 @@ import 'package:astroway/data/omens.dart';
 import 'package:astroway/logic/sunmoon.dart';
 import 'package:astroway/data/palm.dart';
 import 'package:astroway/logic/svg_path.dart';
+import 'package:astroway/logic/tarot.dart';
 import 'package:astroway/logic/profile.dart';
 import 'package:astroway/logic/zodiac.dart';
 import 'package:astroway/screens/home.dart';
 
 import 'dart:io';
+import 'dart:math';
 
 import 'package:astroway/main.dart';
 import 'package:astroway/screens/horoscope.dart';
@@ -22,6 +24,7 @@ import 'package:astroway/screens/numerology.dart';
 import 'package:astroway/screens/omens.dart';
 import 'package:astroway/screens/sunmoon.dart';
 import 'package:astroway/screens/palm.dart';
+import 'package:astroway/screens/tarot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -237,6 +240,35 @@ void main() {
     expect(find.text('Земная рука'), findsOneWidget);
     await tester.tap(find.text('💎 По фото'));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  test('таро: карта дня и расклад', () {
+    expect(majorArcana, hasLength(22));
+    final d = DateTime(2026, 11, 11, 8), e = DateTime(2026, 11, 11, 23);
+    expect(cardOfDay('Анна', d).name, cardOfDay('Анна', e).name);
+    final s = drawThree(Random(1));
+    expect(s.map((c) => c.card.name).toSet(), hasLength(3));
+  });
+
+  testWidgets('экран раскладов', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppState(Store(await SharedPreferences.getInstance()));
+    await app.store.saveProfile(anna);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TarotScreen(app: app, random: Random(7)),
+      ),
+    );
+    await tester.tap(find.byType(TarotCard));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Карта дня:'), findsOneWidget);
+    await tester.tap(find.text('3 карты'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Разложить карты'));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.text('Толкование волшебницы'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

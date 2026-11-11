@@ -14,6 +14,7 @@ import 'numerology.dart';
 import 'omens.dart';
 import 'palm.dart';
 import 'sunmoon.dart';
+import 'tarot.dart';
 import 'onboarding.dart';
 
 enum Scene { morning, day, night }
@@ -55,12 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
-  }
-
-  void _soon(String name) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('Раздел «$name» появится в следующей сборке')));
   }
 
   @override
@@ -221,7 +216,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       'Гороскоп',
                       () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => HoroscopeScreen(app: app))),
                     ),
-                    _Tile('🃏', 'Расклады', () => _soon('Расклады')),
+                    _Tile(
+                      '🃏',
+                      'Расклады',
+                      () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TarotScreen(app: app))),
+                    ),
                     _Tile(
                       '⭐',
                       'Знаки судьбы',
