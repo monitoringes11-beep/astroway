@@ -13,6 +13,7 @@ import 'horoscope.dart';
 import 'numerology.dart';
 import 'omens.dart';
 import 'palm.dart';
+import 'slavic.dart';
 import 'sunmoon.dart';
 import 'tarot.dart';
 import 'onboarding.dart';
@@ -243,6 +244,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   '✋',
                   'Тайны ладони',
                   () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PalmScreen(app: app))),
+                  wide: true,
+                ),
+                const SizedBox(height: 10),
+                _Tile(
+                  '✻',
+                  'Символы славян',
+                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SlavicScreen(app: app))),
                   wide: true,
                 ),
                 const SizedBox(height: 16),
