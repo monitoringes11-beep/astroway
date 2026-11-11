@@ -7,6 +7,7 @@ import 'package:astroway/logic/moon.dart';
 import 'package:astroway/logic/numerology.dart';
 import 'package:astroway/data/numerology_texts.dart';
 import 'package:astroway/data/omens.dart';
+import 'package:astroway/logic/sunmoon.dart';
 import 'package:astroway/logic/profile.dart';
 import 'package:astroway/logic/zodiac.dart';
 import 'package:astroway/screens/home.dart';
@@ -17,6 +18,7 @@ import 'package:astroway/main.dart';
 import 'package:astroway/screens/horoscope.dart';
 import 'package:astroway/screens/numerology.dart';
 import 'package:astroway/screens/omens.dart';
+import 'package:astroway/screens/sunmoon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -181,6 +183,26 @@ void main() {
     await tester.tap(find.text('Рассыпать соль'));
     await tester.pumpAndSettle();
     expect(find.textContaining('традиция'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('луна и солнце: личный разбор', () {
+    expect(personalSun(10, SunEnergy.high), contains('глубина и сила воли'));
+    expect(personalMoon(MoonPhase.full, easy: false), contains('не принимайте решений на эмоциях'));
+    expect(rhythmFits(3, SunEnergy.high, MoonPhase.old), isTrue); // огонь + высокая энергия
+    expect(rhythmFits(3, SunEnergy.low, MoonPhase.old), isFalse);
+    for (final ph in MoonPhase.values) {
+      expect(moonTask(ph), hasLength(2));
+    }
+  });
+
+  testWidgets('экран луны и солнца', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppState(Store(await SharedPreferences.getInstance()));
+    await app.store.saveProfile(anna);
+    await tester.pumpWidget(MaterialApp(home: SunMoonScreen(app: app)));
+    expect(find.textContaining('твои Солнце и Луна'), findsOneWidget);
+    expect(find.textContaining('СКОРПИОН'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

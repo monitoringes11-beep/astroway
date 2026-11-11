@@ -12,6 +12,7 @@ import 'dream.dart';
 import 'horoscope.dart';
 import 'numerology.dart';
 import 'omens.dart';
+import 'sunmoon.dart';
 import 'onboarding.dart';
 
 enum Scene { morning, day, night }
@@ -160,6 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 _SunMoon(
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SunMoonScreen(app: app))),
                   sunLvl: sunLevel(energy),
                   sunTx: sunText(energy, easy: easy),
                   moonLvl: moonLevel(moon.phase),
@@ -224,7 +226,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       'Знаки судьбы',
                       () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OmensScreen(app: app))),
                     ),
-                    _Tile('🌗', 'Луна и Солнце', () => _soon('Луна и Солнце')),
+                    _Tile(
+                      '🌗',
+                      'Луна и Солнце',
+                      () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SunMoonScreen(app: app))),
+                    ),
                     _Tile(
                       '7',
                       'Нумерология',
@@ -282,7 +288,9 @@ class _Prefs extends StatelessWidget {
 
 class _SunMoon extends StatelessWidget {
   final String sunLvl, sunTx, moonLvl, moonTx, balance;
+  final VoidCallback onTap;
   const _SunMoon({
+    required this.onTap,
     required this.sunLvl,
     required this.sunTx,
     required this.moonLvl,
@@ -309,33 +317,36 @@ class _SunMoon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(colors: [Color(0x55FFCE6E), Color(0x556EA0FF)]),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-      ),
-      child: Column(
-        children: [
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _half('Энергия Солнца', AW.gold, sunLvl, sunTx),
-                const SizedBox(width: 8),
-                _half('Настроение Луны', const Color(0xFFA9C8FF), moonLvl, moonTx),
-              ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(colors: [Color(0x55FFCE6E), Color(0x556EA0FF)]),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        ),
+        child: Column(
+          children: [
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _half('Энергия Солнца', AW.gold, sunLvl, sunTx),
+                  const SizedBox(width: 8),
+                  _half('Настроение Луны', const Color(0xFFA9C8FF), moonLvl, moonTx),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AW.navy.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(14)),
-            child: Text('Баланс дня: $balance', style: const TextStyle(fontSize: 14, height: 1.35)),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: AW.navy.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(14)),
+              child: Text('Баланс дня: $balance  ›', style: const TextStyle(fontSize: 14, height: 1.35)),
+            ),
+          ],
+        ),
       ),
     );
   }
