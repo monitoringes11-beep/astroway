@@ -4,7 +4,8 @@
 class SlavicMotif {
   final String glyph, name, meaning, where, when, element;
   final String? note;
-  const SlavicMotif(this.glyph, this.name, this.meaning, this.where, this.when, this.element, {this.note});
+  final String? image; // картинка из Canva в assets/slavic, если уже нарисована
+  const SlavicMotif(this.glyph, this.name, this.meaning, this.where, this.when, this.element, {this.note, this.image});
 }
 
 /// element — подсказка AstroWay, к какой стихии знака зодиака ближе узор (в традиции такой связи нет).
@@ -16,6 +17,7 @@ const slavicMotifs = <SlavicMotif>[
     'Прялки, наличники окон, вальки, полотенца, глиняная посуда.',
     'Весной и летом, к свадьбе, при обустройстве нового дома.',
     'Огонь',
+    image: 'assets/slavic/solar.png',
   ),
   SlavicMotif(
     '✻',
@@ -25,6 +27,7 @@ const slavicMotifs = <SlavicMotif>[
     'При строительстве дома и бани, перед летними грозами.',
     'Огонь',
     note: 'Название «громовой знак» дали этнографы по народным объяснениям.',
+    image: 'assets/slavic/thunder.png',
   ),
   SlavicMotif(
     '◈',
@@ -58,6 +61,7 @@ const slavicMotifs = <SlavicMotif>[
     'Конёк на крыше избы, прялки, ковши, глиняные игрушки, вышивка.',
     'При постройке дома и новоселье, в дорогу.',
     'Огонь',
+    image: 'assets/slavic/horse.png',
   ),
   SlavicMotif(
     '🕊',
@@ -74,6 +78,7 @@ const slavicMotifs = <SlavicMotif>[
     'Подолы, края полотенец, глиняные кувшины и горшки.',
     'Летом, в засуху, на праздники, связанные с водой.',
     'Вода',
+    image: 'assets/slavic/wave.png',
   ),
   SlavicMotif(
     '✚',
