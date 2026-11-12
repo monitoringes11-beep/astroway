@@ -101,17 +101,41 @@ class _PalmScreenState extends State<PalmScreen> {
     );
   }
 
+  String? get _nextLine {
+    final i = palmLines.indexWhere((x) => x.id == _line);
+    for (var k = 1; k <= palmLines.length; k++) {
+      final l = palmLines[(i + k) % palmLines.length];
+      if (!_answers.containsKey(l.id)) return l.id;
+    }
+    return null;
+  }
+
   List<Widget> _questionsAndReading() {
     final l = palmLines.firstWhere((x) => x.id == _line);
-    final left = palmLines.where((x) => !_answers.containsKey(x.id)).map((x) => x.name.replaceFirst('Линия ', ''));
+    final left = palmLines.length - _answers.length;
+    final next = _nextLine;
     return [
       Text(
-        left.isEmpty
-            ? 'Все четыре линии прочитаны ✓ Результат сохранён в дневник.'
-            : 'Нажми на линию на схеме. Осталось: ${left.join(', ')}',
+        left == 0
+            ? 'Все линии прочитаны ✓ Итог сохранён в дневник.'
+            : 'Прочитано ${_answers.length} из ${palmLines.length}. Выбери линию ниже или нажми на неё на схеме.',
         style: const TextStyle(color: AW.soft),
       ),
-      const SizedBox(height: 10),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final x in palmLines)
+            ChoiceChip(
+              label: Text('${_answers.containsKey(x.id) ? '✓ ' : ''}${x.name.replaceFirst('Линия ', '')}'),
+              selected: x.id == _line,
+              showCheckmark: false,
+              onSelected: (_) => setState(() => _line = x.id),
+            ),
+        ],
+      ),
+      const SizedBox(height: 14),
       Text(l.question, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
       const SizedBox(height: 8),
       Wrap(
@@ -130,8 +154,40 @@ class _PalmScreenState extends State<PalmScreen> {
       if (_answers[l.id] != null) ...[
         const SizedBox(height: 14),
         _reading(l, l.variants.firstWhere((v) => v.id == _answers[l.id])),
+        const SizedBox(height: 4),
+        if (next != null)
+          FilledButton(
+            onPressed: () => setState(() => _line = next),
+            child: Text('Дальше: ${palmLines.firstWhere((x) => x.id == next).name} →'),
+          ),
       ],
+      if (left == 0) ...[const SizedBox(height: 14), _summary()],
     ];
+  }
+
+  Widget _summary() {
+    final easy = widget.app.easy;
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Итог по всем линиям',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AW.gold),
+          ),
+          const SizedBox(height: 8),
+          for (final l in palmLines) ...[
+            Text('${l.sphere} · ${l.name}', style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 2),
+            Text(() {
+              final v = l.variants.firstWhere((v) => v.id == _answers[l.id]);
+              return easy ? v.adviceEasy : v.adviceSerious;
+            }(), style: const TextStyle(height: 1.4)),
+            const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
   }
 
   List<Widget> _scheme() => [

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../logic/daily.dart';
 import '../logic/tarot.dart';
 import '../main.dart';
 import '../theme.dart';
@@ -9,8 +10,7 @@ import '../theme.dart';
 /// Расклады Таро: карта дня и «Прошлое, настоящее, будущее» на старших арканах.
 class TarotScreen extends StatefulWidget {
   final AppState app;
-  final Random? random; // для тестов
-  const TarotScreen({super.key, required this.app, this.random});
+  const TarotScreen({super.key, required this.app});
   @override
   State<TarotScreen> createState() => _TarotScreenState();
 }
@@ -33,7 +33,8 @@ class _TarotScreenState extends State<TarotScreen> {
     FocusScope.of(context).unfocus();
     final deal = ++_deal;
     setState(() {
-      _spread = drawThree(widget.random);
+      final p = widget.app.profile!;
+      _spread = spreadFor('${p.name}|${dayKey(p.birthday)}', _question.text, DateTime.now());
       _opened = 0;
     });
     for (var i = 1; i <= 3; i++) {
@@ -140,7 +141,7 @@ class _TarotScreenState extends State<TarotScreen> {
         ],
       ),
       const SizedBox(height: 16),
-      FilledButton(onPressed: _draw, child: Text(s == null ? 'Разложить карты' : 'Разложить заново')),
+      FilledButton(onPressed: _draw, child: const Text('Разложить карты')),
       if (s != null && _opened == 3) ...[
         const SizedBox(height: 16),
         GlassCard(
@@ -176,6 +177,11 @@ class _TarotScreenState extends State<TarotScreen> {
               Text(
                 'Совет волшебницы: опирайся на карту «${s[1].card.name}», она показывает, на чём сейчас твоя сила.',
                 style: const TextStyle(height: 1.4, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'На тот же вопрос карты всегда отвечают одинаково. Вопрос про сегодня получит новый ответ завтра.',
+                style: TextStyle(color: AW.soft, fontSize: 12.5),
               ),
             ],
           ),

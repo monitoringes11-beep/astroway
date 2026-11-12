@@ -18,7 +18,6 @@ import 'package:astroway/logic/zodiac.dart';
 import 'package:astroway/screens/home.dart';
 
 import 'dart:io';
-import 'dart:math';
 
 import 'package:astroway/main.dart';
 import 'package:astroway/screens/horoscope.dart';
@@ -253,7 +252,7 @@ void main() {
   });
 
   test('ладонь: данные и тип руки', () {
-    expect(palmLines.map((l) => l.id), ['life', 'heart', 'head', 'fate']);
+    expect(palmLines.map((l) => l.id), ['life', 'heart', 'head', 'fate', 'sun', 'bond']);
     expect(handTypes[handTypeKey(squarePalm: true, shortFingers: true)]![0], 'Земная рука');
     expect(handTypes[handTypeKey(squarePalm: false, shortFingers: false)]![0], 'Водная рука');
     for (final l in palmLines) {
@@ -266,10 +265,26 @@ void main() {
     final app = AppState(Store(await SharedPreferences.getInstance()));
     await app.store.saveProfile(anna);
     await tester.pumpWidget(MaterialApp(home: PalmScreen(app: app)));
-    await tester.ensureVisible(find.text('Широкой дугой к центру ладони'));
+    await tester.scrollUntilVisible(
+      find.text('Широкой дугой к центру ладони'),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Широкой дугой к центру ладони'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Линия жизни: широкой дугой'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Дальше: Линия сердца →'),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Дальше: Линия сердца →'));
+    await tester.pumpAndSettle();
+    expect(find.text('Где заканчивается линия сердца?'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Солнца'), 150, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('Солнца'));
+    await tester.pumpAndSettle();
+    expect(find.text('Есть ли линия к безымянному пальцу?'), findsOneWidget);
     await tester.drag(find.byType(ListView), const Offset(0, 3000));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Тип руки'));
@@ -287,19 +302,23 @@ void main() {
     expect(majorArcana, hasLength(22));
     final d = DateTime(2026, 11, 11, 8), e = DateTime(2026, 11, 11, 23);
     expect(cardOfDay('Анна', d).name, cardOfDay('Анна', e).name);
-    final s = drawThree(Random(1));
+    String names(List<DrawnCard> l) => l.map((c) => '${c.card.name}${c.reversed}').join();
+    final s = spreadFor('Анна', 'Как пройдёт мой день?', d);
     expect(s.map((c) => c.card.name).toSet(), hasLength(3));
+    expect(names(spreadFor('Анна', 'как пройдет день', e)), names(s));
+    expect(normalizeQuestion('Как пройдёт мой день?'), normalizeQuestion('как пройдет день'));
+    // вопрос про день меняется завтра, вопрос без времени не меняется
+    final tomorrow = d.add(const Duration(days: 1));
+    final days = {for (var i = 0; i < 10; i++) names(spreadFor('Анна', 'как пройдет день', d.add(Duration(days: i))))};
+    expect(days.length, greaterThan(1));
+    expect(names(spreadFor('Анна', 'Выйду ли я замуж?', d)), names(spreadFor('Анна', 'выйду замуж', tomorrow)));
   });
 
   testWidgets('экран раскладов', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final app = AppState(Store(await SharedPreferences.getInstance()));
     await app.store.saveProfile(anna);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: TarotScreen(app: app, random: Random(7)),
-      ),
-    );
+    await tester.pumpWidget(MaterialApp(home: TarotScreen(app: app)));
     await tester.tap(find.byType(TarotCard));
     await tester.pumpAndSettle();
     expect(find.textContaining('Карта дня:'), findsOneWidget);

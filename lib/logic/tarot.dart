@@ -50,9 +50,33 @@ Arcana cardOfDay(String name, DateTime d) => pick(majorArcana, '${name}tarot${da
 
 const spreadPositions = ['Прошлое', 'Настоящее', 'Будущее'];
 
-/// Расклад на три карты без повторов; перевёрнутая карта выпадает с вероятностью 30%.
-List<DrawnCard> drawThree([Random? rnd]) {
-  final r = rnd ?? Random();
+const _filler = <String>{
+  ...['а', 'и', 'в', 'во', 'на', 'у', 'к', 'ко', 'с', 'со', 'о', 'об', 'по', 'за', 'для', 'ли', 'же', 'ну'],
+  ...['то', 'это', 'мой', 'моя', 'мое', 'мои', 'мне', 'меня', 'мной', 'я', 'будет', 'ждет'],
+};
+const _timeStems = ['сегодн', 'завтр', 'вчер', 'день', 'дня', 'дне', 'вечер', 'утр', 'ночь', 'недел', 'сейчас'];
+
+/// Вопрос без регистра, знаков и слов-связок, слова по порядку:
+/// «Как пройдёт мой день?» и «как пройдет день» считаются одним вопросом.
+String normalizeQuestion(String q) {
+  final words =
+      q
+          .toLowerCase()
+          .replaceAll('ё', 'е')
+          .split(RegExp(r'[^a-zа-я0-9]+'))
+          .where((w) => w.isNotEmpty && !_filler.contains(w))
+          .toList()
+        ..sort();
+  return words.join(' ');
+}
+
+/// Расклад на три карты без повторов. Один и тот же вопрос даёт один и тот же ответ:
+/// вопрос про сегодня/завтра/день меняется только с новым днём, вопрос без времени не меняется никогда.
+/// Пустой вопрос даёт расклад дня.
+List<DrawnCard> spreadFor(String person, String question, DateTime date) {
+  final q = normalizeQuestion(question);
+  final timed = q.isEmpty || q.split(' ').any((w) => _timeStems.any(w.startsWith));
+  final r = Random(stableHash('$person|$q|${timed ? dayKey(date) : ''}'));
   final idx = List.generate(majorArcana.length, (i) => i)..shuffle(r);
   return [for (final i in idx.take(3)) DrawnCard(majorArcana[i], r.nextDouble() < 0.3)];
 }
