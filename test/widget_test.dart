@@ -12,7 +12,6 @@ import 'package:astroway/logic/sunmoon.dart';
 import 'package:astroway/data/palm.dart';
 import 'package:astroway/logic/svg_path.dart';
 import 'package:astroway/logic/tarot.dart';
-import 'package:astroway/data/slavic.dart';
 import 'package:astroway/logic/profile.dart';
 import 'package:astroway/logic/zodiac.dart';
 import 'package:astroway/screens/home.dart';
@@ -26,7 +25,6 @@ import 'package:astroway/screens/omens.dart';
 import 'package:astroway/screens/sunmoon.dart';
 import 'package:astroway/screens/palm.dart';
 import 'package:astroway/screens/tarot.dart';
-import 'package:astroway/screens/slavic.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -328,34 +326,6 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
     expect(find.text('Толкование волшебницы'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
-  test('славянские символы: чертоги по дате', () {
-    expect(chertogs, hasLength(16));
-    expect(chertogOf(DateTime(1990, 11, 5)).name, 'Лебедь');
-    expect(chertogOf(DateTime(1990, 2, 24)).name, 'Бусел (Аист)');
-    expect(chertogOf(DateTime(1990, 2, 25)).name, 'Волк');
-    expect(chertogOf(DateTime(1990, 1, 3)).name, 'Ворон');
-    expect(chertogOf(DateTime(1990, 12, 31)).name, 'Ворон');
-    final names = [for (final s in signs) s.name];
-    expect(zodiacOverlap(chertogs.firstWhere((c) => c.name == 'Лебедь'), signIndexOf, names), ['Скорпион', 'Стрелец']);
-    for (final e in elements) {
-      expect(slavicMotifs.where((m) => m.element == e), isNotEmpty);
-    }
-  });
-
-  testWidgets('экран славянских символов', (tester) async {
-    SharedPreferences.setMockInitialValues({});
-    final app = AppState(Store(await SharedPreferences.getInstance()));
-    await app.store.saveProfile(anna);
-    await tester.pumpWidget(MaterialApp(home: SlavicScreen(app: app)));
-    await tester.tap(find.text('Солнечная розетка'));
-    await tester.pumpAndSettle();
-    expect(find.text('КОГДА ЛУЧШЕ ИСПОЛЬЗОВАТЬ'), findsOneWidget);
-    await tester.tap(find.text('Сварожий круг'));
-    await tester.pumpAndSettle();
-    expect(find.text('Чертог Лебедь'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }

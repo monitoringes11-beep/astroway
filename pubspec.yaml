@@ -64,7 +64,6 @@ flutter:
   assets:
     - assets/images/
     - assets/dreams_ru.json
-    - assets/slavic/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
