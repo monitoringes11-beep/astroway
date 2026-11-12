@@ -9,7 +9,8 @@ import '../theme.dart';
 class OnboardingScreen extends StatefulWidget {
   final AppState app;
   final Profile? initial;
-  const OnboardingScreen({super.key, required this.app, this.initial});
+  final bool addNew; // новый профиль из экрана выбора
+  const OnboardingScreen({super.key, required this.app, this.initial, this.addNew = false});
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
@@ -45,8 +46,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _save() async {
     final p = Profile(name: _name.text.trim(), gender: _gender, birthday: _birthday!, birthSlot: _slot);
-    await widget.app.saveProfile(p);
-    if (mounted && widget.initial != null) Navigator.of(context).pop();
+    if (widget.addNew) {
+      await widget.app.addProfile(p);
+    } else {
+      await widget.app.saveProfile(p);
+    }
+    if (mounted && (widget.initial != null || widget.addNew)) Navigator.of(context).pop();
   }
 
   @override
@@ -55,7 +60,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final p = b == null ? null : Profile(name: '', gender: _gender, birthday: b, birthSlot: _slot);
     final age = p?.ageOn(DateTime.now());
     return Scaffold(
-      appBar: widget.initial != null ? AppBar(title: const Text('Мой профиль')) : null,
+      appBar: widget.initial != null || widget.addNew
+          ? AppBar(title: Text(widget.addNew ? 'Новый профиль' : 'Мой профиль'))
+          : null,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),

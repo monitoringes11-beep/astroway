@@ -22,10 +22,10 @@ class WitchAnswer {
 }
 
 class WitchMemory {
-  static const _key = 'astroway-answers';
   static const _limit = 200;
   final SharedPreferences prefs;
-  WitchMemory(this.prefs);
+  final String _key;
+  WitchMemory(this.prefs, [this._key = 'astroway-answers']);
 
   List<WitchAnswer> all() {
     final raw = prefs.getString(_key);

@@ -24,6 +24,7 @@ import 'package:astroway/screens/numerology.dart';
 import 'package:astroway/screens/omens.dart';
 import 'package:astroway/screens/sunmoon.dart';
 import 'package:astroway/screens/palm.dart';
+import 'package:astroway/screens/profiles.dart';
 import 'package:astroway/screens/tarot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -326,6 +327,44 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
     expect(find.text('Толкование волшебницы'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('профили: перенос старого, несколько профилей, код, выход', () async {
+    SharedPreferences.setMockInitialValues({
+      'astroway-profile': '{"name":"Анна","gender":"female","birthday":"1990-11-05","birthSlot":"09–12"}',
+      'astroway-answers': '[]',
+    });
+    final store = Store(await SharedPreferences.getInstance());
+    expect(store.profile?.name, 'Анна');
+    expect(store.activeId, Store.legacyId);
+    expect(Store.memoryKeyFor(store.activeId!), 'astroway-answers');
+    final oleg = Profile(name: 'Олег', gender: Gender.male, birthday: DateTime(1985, 3, 30), birthSlot: slotUnknown);
+    final id = await store.addProfile(oleg);
+    expect(store.profiles, hasLength(2));
+    expect(store.profile?.name, 'Олег');
+    await store.setPin(id, '1234');
+    final e = store.active!;
+    expect(store.checkPin(e, '1234'), isTrue);
+    expect(store.checkPin(e, '0000'), isFalse);
+    await store.logout();
+    expect(store.profile, isNull);
+    await store.login(Store.legacyId);
+    expect(store.profile?.name, 'Анна');
+    await store.deleteProfile(id);
+    expect(store.profiles.map((e) => e.profile.name), ['Анна']);
+  });
+
+  testWidgets('экран входа: выбор профиля и выход', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppState(Store(await SharedPreferences.getInstance()));
+    await app.store.saveProfile(anna);
+    await app.store.logout();
+    await tester.pumpWidget(MaterialApp(home: ProfilesScreen(app: app)));
+    expect(find.text('Кто заходит?'), findsOneWidget);
+    await tester.tap(find.text('Анна'));
+    await tester.pumpAndSettle();
+    expect(app.profile?.name, 'Анна');
     expect(tester.takeException(), isNull);
   });
 }

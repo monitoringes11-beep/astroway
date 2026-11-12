@@ -13,6 +13,7 @@ import 'horoscope.dart';
 import 'numerology.dart';
 import 'omens.dart';
 import 'palm.dart';
+import 'profiles.dart';
 import 'sunmoon.dart';
 import 'tarot.dart';
 import 'onboarding.dart';
@@ -109,9 +110,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       '${_now.hour.toString().padLeft(2, '0')}:${_now.minute.toString().padLeft(2, '0')}',
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
+                    ProfileMenu(app: app),
                   ],
                 ),
-                const SizedBox(height: 180),
+                const SizedBox(height: 160),
                 Text(
                   '${greetingFor(_now)}, ${p.name}',
                   style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
