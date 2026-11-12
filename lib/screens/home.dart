@@ -9,6 +9,7 @@ import '../logic/zodiac.dart';
 import '../main.dart';
 import '../theme.dart';
 import 'dream.dart';
+import 'feedback.dart';
 import 'horoscope.dart';
 import 'numerology.dart';
 import 'omens.dart';
@@ -252,6 +253,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   '✋',
                   'Тайны ладони',
                   () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PalmScreen(app: app))),
+                  wide: true,
+                ),
+                const SizedBox(height: 10),
+                _Tile(
+                  '💬',
+                  'Обратная связь',
+                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => FeedbackScreen(app: app))),
                   wide: true,
                 ),
                 const SizedBox(height: 16),

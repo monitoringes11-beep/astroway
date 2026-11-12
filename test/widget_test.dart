@@ -23,6 +23,7 @@ import 'package:astroway/screens/horoscope.dart';
 import 'package:astroway/screens/numerology.dart';
 import 'package:astroway/screens/omens.dart';
 import 'package:astroway/screens/sunmoon.dart';
+import 'package:astroway/screens/feedback.dart';
 import 'package:astroway/screens/palm.dart';
 import 'package:astroway/screens/profiles.dart';
 import 'package:astroway/screens/tarot.dart';
@@ -365,6 +366,33 @@ void main() {
     await tester.tap(find.text('Анна'));
     await tester.pumpAndSettle();
     expect(app.profile?.name, 'Анна');
+    expect(tester.takeException(), isNull);
+  });
+
+  test('обратная связь: письмо без личных данных', () {
+    final b = feedbackBody(
+      mood: '🙂',
+      kinds: {'✨ Не хватает'},
+      sections: {'Сонник'},
+      text: 'Нет слова вокзал',
+      missed: ['вокзал'],
+    );
+    expect(b, contains('Раздел: Сонник'));
+    expect(b, contains('Нет слова вокзал'));
+    expect(b, contains('не нашлось в соннике: вокзал'));
+    expect(b.contains('Анна'), isFalse);
+  });
+
+  testWidgets('экран обратной связи', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppState(Store(await SharedPreferences.getInstance()));
+    await app.store.saveProfile(anna);
+    await tester.pumpWidget(MaterialApp(home: FeedbackScreen(app: app)));
+    await tester.tap(find.text('😍'));
+    await tester.tap(find.text('✨ Не хватает'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byType(FilledButton), 200, scrollable: find.byType(Scrollable).first);
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNotNull);
     expect(tester.takeException(), isNull);
   });
 }
