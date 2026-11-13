@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v11</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v12</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -350,7 +350,22 @@ const LINES = {
   ol:{name:'Общая линия (ОЛ, первая линия)', short:'ОЛ',
     ru:'Приветствие|Выявление потребностей|Фраза-мост к презентации|Презентация продукта|Фраза-мост к цене|Цена: два курса, начиная с дорогого|Фраза-мост к возражениям|Работа с возражениями|Результат (продажа или отказ)',
     es:'Saludo|Detección de necesidades|Frase puente a la presentación|Presentación del producto|Frase puente al precio|Precio: dos cursos, empezando por el más caro|Frase puente a las objeciones|Manejo de objeciones|Resultado (venta o rechazo)',
-    rules:`Звонок общей линии (ОЛ, первая линия). Этапы продаж строго в таком порядке: 1) приветствие; 2) выявление потребностей; 3) фраза-«мост» к следующему этапу; 4) презентация продукта; 5) фраза-«мост»; 6) произнесение цены, начиная с высокой, демонстрируя ДВА курса, чтобы клиент выбрал один из них; 7) фраза-«мост»; 8) работа с возражениями; 9) результат — продажа или отказ. Проверь наличие каждой фразы-«моста» между этапами; пропущенный мост или этап — ошибка. Цена показывается двумя курсами на выбор.`},
+    rules:`Звонок общей линии (ОЛ, первая линия). Этапы продаж строго в таком порядке: 1) приветствие; 2) выявление потребностей; 3) фраза-«мост» к следующему этапу; 4) презентация продукта; 5) фраза-«мост»; 6) произнесение цены, начиная с высокой, демонстрируя ДВА курса, чтобы клиент выбрал один из них; 7) фраза-«мост»; 8) работа с возражениями; 9) результат — продажа или отказ. Проверь наличие каждой фразы-«моста» между этапами; пропущенный мост или этап — ошибка. Цена показывается двумя курсами на выбор.
+РЕГЛАМЕНТ КОЛЛ-ЦЕНТРА ПЕРВОЙ ЛИНИИ (проверь звонок по каждому пункту).
+Оператор обязан при любом итоге:
+1) представиться по скрипту; ЗАПРЕЩЕНО спрашивать «Вам удобно сейчас разговаривать?» и аналогичное;
+2) сохранять спокойствие и нейтральный эмоциональный тон;
+3) выявить потребности и провести презентацию ДО оглашения цен;
+4) предлагать курсы строго по таблице цен, не придумывать курсы самому;
+5) минимальный курс — только после ДВУХ отработок возражений (возражение → отработка, возражение → отработка, возражение → минимальный курс) и отказа клиента от оптимального/полного курса;
+6) при обрыве связи — перезвонить клиенту (перезвон = звонок не менее 20 сек или 3 гудков);
+7) не использовать стоп-слова; поставить корректный статус.
+При отказе: работа с возражениями обязательно в 2 этапа; завершать звонок только когда предприняты все меры. Исключение — клиент бросил трубку сразу после цены.
+При продаже обязательно: уточнить ФИО, возраст, дату рождения, адрес и детали доставки (домофон — сверить имя, шлагбаум), дополнительный номер; при доставке курьером — сказать про наличные и сдачу; назвать полную стоимость (курс + доп. продукты + доставка + комиссия почты); подвести резюме заказа (продукты, число упаковок, полная сумма); сообщить сроки и детали доставки; предложить доп. продажу (название — направление действия — стоимость); заключить устный договор-оферту на выкуп и получить однозначное «да» (сообщение о сроке хранения на ПВЗ — не гарантия выкупа). Если у клиента уже есть заказ в пути — новый оформляется только на ДРУГОЙ продукт, с информированием и офертой на выкуп обоих заказов с суммами.
+Перезвон (статусы): «Неудобно говорить», «Клиента нет дома», «Срыв связи» — только В НАЧАЛЕ разговора (до выявления потребностей), только на сегодня/завтра. Просьба перезвонить после презентации или срыв связи после выявления потребностей = отказ (отклон). «Я подумаю» как перезвон — ЗАПРЕЩЕНО. Ночной/ранний звонок, клиент возмущён, но не отказывается: «Просим прощения, свяжемся с вами утром» и перезвон на утро.
+СЛИВ ЗАКАЗА (грубое нарушение): клиента слышно, а оператор молчит или не перезвонил; оператор сам завершает звонок без уважительной причины («вас не слышно» и сброс, фиктивный перезвон); оператор предлагает перезвон, хотя клиент не просил; связь прервалась, а оператор не перезвонил; оператор хамит клиенту.
+Слова-ловушки (если они есть — допустим только валидный статус: отказ или подтверждён, невалид запрещён): было выявление потребностей (больше 3 вопросов о симптомах) и следующие этапы; вопросы клиента о цене («Сколько стоит?», «Точно бесплатно?»); любые возражения и сомнения, в т.ч. о качестве («Это не подделка?»); мат/претензии клиента; оператор произнёс «курс», «комплект», «набор», «приобретаете/покупаете/оплачиваете», «бесплатно», «за 20 евро».
+Статусы отказа (выбери подходящий): Отказ; Бросил трубку и не отвечает; Закажу потом — нужно посоветоваться; Пробовал много продуктов / купил другой; Не заказывал; Закажу потом — уезжаю; Негативные отзывы; Хочет 1 уп.; Сброс на цене; Противопоказание (аллергия, беременность/кормление). Невалидные: Передумал сразу (звонок не дольше 40 сек), Не заказывал (3-е лицо), Заказан у конкурентов (уточнить упаковки, сумму, другой номер и всё равно провести презентацию и продажу — мы единственные продавцы оригинала), Языковой барьер, Хамство/спам, Дубль (тот же товар и номер в течение 30 дней), Консультация, Нет доставки.`, regs:true},
   base:{name:'Вторая линия, группа «База»', short:'База',
     ru:'Приветствие|Работа с возражениями (если есть)|Выявление потребностей и самочувствия|Презентация: результаты и на что влияет продукт|Цена: от высокого курса вниз',
     es:'Saludo|Manejo de objeciones (si las hay)|Detección de necesidades y cómo se siente|Presentación: resultados y en qué influye el producto|Precio: del curso más alto hacia abajo',
@@ -383,6 +398,10 @@ ${rulesBlock()}
 "score":число 1-10,
 "sale":"что и за сколько продано (курс, число упаковок, сумма в €) или «нет продажи»",
 "check_note":"сравнение суммы с нормой группы (средний и минимальный чек), если применимо; иначе пусто",
+${L.regs?`"crm_status":"какой статус по регламенту нужно поставить в CRM и почему (одной строкой)",
+"drain":"есть ли признаки СЛИВА заказа: «нет» или в чём слив",
+"trap_words":"какие слова-ловушки прозвучали (тогда невалид запрещён) или «нет»",
+"checklist":[{"item":"пункт регламента (представление по скрипту, без «удобно ли говорить», спокойный тон, потребности и презентация до цены, курсы по таблице, 2 отработки до минимального курса, данные заказа, полная стоимость, резюме заказа, сроки доставки, доп. продажа, оферта на выкуп)","ok":true|false|null,"comment":"коротко; null — не применимо"}],`:''}
 "stages":[{"name":"${L[lang]}","score":1-10,"comment":"коротко"}],
 "strengths":["что оператор сделал хорошо"],
 "mistakes":[{"quote":"цитата оператора","problem":"в чём ошибка","better":"как сказать лучше"}],
@@ -430,7 +449,7 @@ async function runMany(files){
 async function summarize(calls, lang, line){
   const t = T[lang||'ru']; const L = LINES[line||'ol'];
   status(lang==='es'?'Готовлю сводный отчёт на испанском…':'Готовлю сводный разбор по всем звонкам…', 92);
-  const brief = calls.map((c,i)=>({call:i+1, name:c.name, score:c.report.score, outcome:c.report.outcome, sale:c.report.sale, stages:c.report.stages, strengths:c.report.strengths, mistakes:c.report.mistakes, objections:c.report.objections, recommendations:c.report.recommendations}));
+  const brief = calls.map((c,i)=>({call:i+1, name:c.name, score:c.report.score, outcome:c.report.outcome, sale:c.report.sale, crm_status:c.report.crm_status, drain:c.report.drain, regulation_fails:(c.report.checklist||[]).filter(x=>x.ok===false).map(x=>x.item), stages:c.report.stages, strengths:c.report.strengths, mistakes:c.report.mistakes, objections:c.report.objections, recommendations:c.report.recommendations}));
   const sys = `Ты — опытный тренер по продажам. Ниже разборы нескольких звонков ОДНОГО оператора. Сделай сводный разбор: найди закономерности, повторяющиеся ошибки и сильные стороны, а не пересказывай каждый звонок.
 ЛИНИЯ И ЭТАПЫ ПРОДАЖ: ${L.rules}
 Отдельно оцени, на каких этапах оператор стабильно проседает, и как его продажи соотносятся с нормой чека группы.
@@ -465,10 +484,11 @@ function render(c){
   $('tab-report').innerHTML = `
     <div class="row" style="align-items:center">
       <div style="flex:0 0 auto"><div class="score">${esc(r.score??'—')}<span class="muted" style="font-size:16px">/10</span></div></div>
-      <div><span class="pill">${esc(LINES[lineOf(c)].short)}</span> <b>${t.outcome}:</b> ${esc(r.outcome)}${r.sale?`<br><b>💶 ${lang==='es'?'Venta':'Продажа'}:</b> ${esc(r.sale)}`:''}${r.check_note?`<br><span class="muted">${esc(r.check_note)}</span>`:''}</div>
+      <div><span class="pill">${esc(LINES[lineOf(c)].short)}</span> <b>${t.outcome}:</b> ${esc(r.outcome)}${r.sale?`<br><b>💶 ${lang==='es'?'Venta':'Продажа'}:</b> ${esc(r.sale)}`:''}${r.check_note?`<br><span class="muted">${esc(r.check_note)}</span>`:''}${r.crm_status?`<br><b>🏷️ ${lang==='es'?'Estado en CRM':'Статус в CRM'}:</b> ${esc(r.crm_status)}`:''}${r.drain&&!/^(нет|no)\b/i.test(r.drain)?`<br><b class="bad">⚠️ ${lang==='es'?'Pérdida del pedido':'Слив заказа'}:</b> ${esc(r.drain)}`:''}${r.trap_words&&!/^(нет|no)\b/i.test(r.trap_words)?`<br><span class="muted">${lang==='es'?'Palabras trampa':'Слова-ловушки'}: ${esc(r.trap_words)}</span>`:''}</div>
     </div>
     <h3>📄 ${t.resume}</h3><div class="item">${esc(r.summary)}</div>
     ${(r.stages||[]).length?`<h3>${t.stages}</h3>`+r.stages.map(x=>`<div class="item"><span class="pill">${esc(x.score)}/10</span> <b>${esc(x.name)}</b> — ${esc(x.comment)}</div>`).join(''):''}
+    ${(r.checklist||[]).length?`<h3>📋 ${lang==='es'?'Cumplimiento del reglamento':'Чек-лист регламента'}</h3>`+r.checklist.map(x=>`<div class="item">${x.ok===true?'✅':x.ok===false?'❌':'➖'} <b>${esc(x.item)}</b>${x.comment?` — ${esc(x.comment)}`:''}</div>`).join(''):''}
     <h3>✅ ${t.strengths}</h3>${list(r.strengths)}
     <h3>❌ ${t.mistakes}</h3>${(r.mistakes||[]).map(m=>`<div class="item"><div class="q">«${esc(m.quote)}»</div><div class="bad">${esc(m.problem)}</div><div class="good">${t.better}: ${esc(m.better)}</div></div>`).join('')||`<p class="muted">${t.noMistakes}</p>`}
     <h3>🛡️ ${t.objections}</h3>${(r.objections||[]).map(o=>`<div class="item"><b>${esc(o.objection)}</b> <span class="pill">${esc(o.verdict)}</span><div class="q">${t.op}: ${esc(o.operator_response)}</div><div class="good">${t.strong}: ${esc(o.better_response)}</div></div>`).join('')||`<p class="muted">${t.noObj}</p>`}
@@ -542,7 +562,8 @@ function plainText(c){
   const r = c.report||{}, t = T[c.lang||'ru'], L = [];
   L.push(`${t.title}: ${c.name} (${c.date})`, '');
   if(!r.error){
-    L.push(LINES[lineOf(c)].name, `${t.score}: ${r.score}/10`, `${t.outcome}: ${r.outcome}`, ...(r.sale?[`💶 ${r.sale}`]:[]), ...(r.check_note?[r.check_note]:[]), '', '📄 '+t.resume.toUpperCase()+':', r.summary||'', '');
+    L.push(LINES[lineOf(c)].name, `${t.score}: ${r.score}/10`, `${t.outcome}: ${r.outcome}`, ...(r.sale?[`💶 ${r.sale}`]:[]), ...(r.check_note?[r.check_note]:[]), ...(r.crm_status?['🏷️ CRM: '+r.crm_status]:[]), ...(r.drain&&!/^(нет|no)\b/i.test(r.drain)?['⚠️ '+r.drain]:[]), '', '📄 '+t.resume.toUpperCase()+':', r.summary||'', '');
+    if((r.checklist||[]).length){ L.push((c.lang==='es'?'REGLAMENTO':'ЧЕК-ЛИСТ РЕГЛАМЕНТА')+':'); r.checklist.forEach(x=>L.push(`${x.ok===true?'✅':x.ok===false?'❌':'➖'} ${x.item}${x.comment?' — '+x.comment:''}`)); L.push(''); }
     if((r.stages||[]).length){ L.push(t.stages.toUpperCase()+':'); r.stages.forEach(x=>L.push(`- ${x.name}: ${x.score}/10 — ${x.comment}`)); }
     L.push('', '✅ '+t.strengths.toUpperCase()+':', ...(r.strengths||[]).map(x=>'- '+x));
     L.push('', '❌ '+t.mistakes.toUpperCase()+':', ...(r.mistakes||[]).map(m=>`- «${m.quote}» — ${m.problem}\n  ${t.better}: ${m.better}`));
