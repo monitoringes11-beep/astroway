@@ -75,8 +75,9 @@ ul{margin:6px 0;padding-left:20px}
     <div class="row" style="margin-top:10px">
       <div><label>Модель анализа</label>
         <select id="model">
-          <option value="llama-3.3-70b-versatile">Llama 3.3 70B (по умолчанию)</option>
+          <option value="auto">Автоматически (рекомендуется)</option>
           <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
+          <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
           <option value="llama-3.1-8b-instant">Llama 3.1 8B (быстрее, проще)</option>
         </select></div>
       <div><label>Что продаёт оператор (необязательно, улучшит советы)</label>
@@ -122,7 +123,7 @@ ul{margin:6px 0;padding-left:20px}
 <script>
 const $ = id => document.getElementById(id);
 const API = 'https://api.groq.com/openai/v1';
-const MODELS = ['llama-3.3-70b-versatile','openai/gpt-oss-120b','llama-3.1-8b-instant'];
+const MODELS = ['openai/gpt-oss-120b','llama-3.3-70b-versatile','meta-llama/llama-4-maverick-17b-128e-instruct','openai/gpt-oss-20b','meta-llama/llama-4-scout-17b-16e-instruct','llama-3.1-8b-instant'];
 const LS = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v===null?d:JSON.parse(v); }catch{ return d; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
@@ -135,7 +136,7 @@ function loadSettings(){
   if(hk){ LS.set('key', hk[1]); history.replaceState(null,'',location.pathname+location.search); }
   $('apiKey').value = LS.get('key','');
   $('reportLang').value = LS.get('reportLang','ru');
-  $('model').value = LS.get('model','llama-3.3-70b-versatile');
+  $('model').value = LS.get('model','auto'); if(!$('model').value) $('model').value='auto';
   $('context').value = LS.get('context','');
   $('lang').value = LS.get('lang','');
   if(!$('apiKey').value) $('settings').classList.remove('hidden');
@@ -178,8 +179,8 @@ async function groq(path, body, isForm){
       const m = msg.match(/try again in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)?s?/i);
       const ra = parseFloat(r.headers.get('retry-after')) || (m ? (+m[1]||0)*3600+(+m[2]||0)*60+(+m[3]||0) : 15);
       if((ra>90 || /per day/i.test(msg)) && !isForm){ // дневной лимит модели исчерпан: берём следующую бесплатную модель
-        const i = MODELS.indexOf(body.model);
-        if(i>-1 && i<MODELS.length-1){ body.model = MODELS[i+1]; status('Лимит модели на сегодня исчерпан, переключаюсь на '+body.model+'…'); continue; }
+        status('Лимит модели на сегодня исчерпан, переключаюсь на другую…');
+        throw new Error('лимит '+body.model);
       }
       const wait = Math.min(60, ra);
       status(`Бесплатный лимит Groq: жду ${Math.ceil(wait)} сек и продолжаю…`);
@@ -192,14 +193,39 @@ async function groq(path, body, isForm){
   throw new Error('Groq перегружен, попробуйте через минуту.');
 }
 
+let liveModels = null; const badModels = new Set();
+async function modelQueue(){
+  const pick = LS.get('model','auto');
+  let q = [...new Set([pick, ...MODELS].filter(m => m && m!=='auto'))];
+  try{
+    if(!liveModels){
+      const r = await fetch(API+'/models', {headers:{Authorization:'Bearer '+LS.get('key','')}});
+      const d = await r.json();
+      liveModels = (d.data||[]).filter(m => m.active!==false).map(m => m.id)
+        .filter(id => !/whisper|guard|tts|playai|orpheus|distil|compound|safeguard/i.test(id));
+    }
+    if(liveModels.length){ q = q.filter(m => liveModels.includes(m)); liveModels.forEach(m => { if(!q.includes(m)) q.push(m); }); }
+  }catch{}
+  return q.filter(m => !badModels.has(m));
+}
 async function chatJSON(system, user){
-  const pick = LS.get('model', MODELS[0]);
-  const d = await groq('/chat/completions', {
-    model: pick, temperature: 0.2,
-    response_format: {type:'json_object'},
-    messages: [{role:'system',content:system},{role:'user',content:user}]
-  });
-  return JSON.parse(d.choices[0].message.content);
+  const q = await modelQueue(); let lastErr;
+  for(const model of q){
+    try{
+      const d = await groq('/chat/completions', {
+        model, temperature: 0.2, response_format: {type:'json_object'},
+        messages: [{role:'system',content:system},{role:'user',content:user}]
+      });
+      const txt = (d.choices[0].message.content||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();
+      return JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}')+1));
+    }catch(e){
+      lastErr = e;
+      if(/does not exist|not have access|decommissioned|not found|not supported|лимит/i.test(e.message)){ badModels.add(model); continue; }
+      if(/json|Unexpected/i.test(e.message)) continue;
+      throw e;
+    }
+  }
+  throw lastErr || new Error('Нет доступной модели Groq.');
 }
 
 /* ---------- audio: split big files into 16kHz mono WAV chunks ---------- */
