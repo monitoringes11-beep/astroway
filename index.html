@@ -63,7 +63,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v5</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v6</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -86,6 +86,8 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
       <div><label>Что продаёт оператор (необязательно, улучшит советы)</label>
         <input id="context" placeholder="напр.: курсы английского, тур в Канкун"></div>
     </div>
+    <div style="margin-top:10px"><label>Правила компании (ИИ проверяет звонки по ним и не советует того, что запрещено)</label>
+      <textarea id="rules" rows="9" style="font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%"></textarea></div>
     <p class="muted">Ключ получить бесплатно: <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a></p>
     <div class="actions"><button class="primary" id="btnSave">Сохранить</button></div>
   </div>
@@ -138,6 +140,11 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <script>
 const $ = id => document.getElementById(id);
 const API = 'https://api.groq.com/openai/v1';
+const DEFAULT_RULES = `Продаём БАДы (биологически активные добавки) — помощь организму в улучшении состояния.
+1. Перезвон клиенту возможен только в течение 24 часов: сегодня попозже или максимум завтра. Предлагать перезвон через неделю, две недели и т.п. нельзя — такой случай считается отказом.
+2. Нельзя отправлять информацию по WhatsApp, почте или другим каналам. Вся информация — на сайте, где клиент видел объявление о продукте.
+3. Если клиент уже ходит к врачу — поддерживаем это. Но специально отправлять клиента к врачу «проверьтесь» нельзя. Исключение — если по разговору ясно, что ситуация очень тяжёлая и без врача не обойтись.
+4. Можно и нужно рекомендовать начать принимать продукт, чтобы клиент уже начал улучшать своё здоровье.`;
 const MODELS = ['openai/gpt-oss-120b','llama-3.3-70b-versatile','meta-llama/llama-4-maverick-17b-128e-instruct','openai/gpt-oss-20b','meta-llama/llama-4-scout-17b-16e-instruct','llama-3.1-8b-instant'];
 const LS = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v===null?d:JSON.parse(v); }catch{ return d; } },
@@ -152,14 +159,15 @@ function loadSettings(){
   $('apiKey').value = LS.get('key','');
   $('reportLang').value = LS.get('reportLang','ru');
   $('model').value = LS.get('model','auto'); if(!$('model').value) $('model').value='auto';
-  $('context').value = LS.get('context','');
+  $('context').value = LS.get('context','БАДы');
+  $('rules').value = LS.get('rules', DEFAULT_RULES);
   $('lang').value = LS.get('lang','');
   if(!$('apiKey').value) $('settings').classList.remove('hidden');
 }
 $('btnSettings').onclick = () => $('settings').classList.toggle('hidden');
 $('btnSave').onclick = () => {
   LS.set('key', $('apiKey').value.trim()); LS.set('reportLang', $('reportLang').value);
-  LS.set('model', $('model').value); LS.set('context', $('context').value.trim());
+  LS.set('model', $('model').value); LS.set('context', $('context').value.trim()); LS.set('rules', $('rules').value.trim());
   $('settings').classList.add('hidden');
 };
 $('lang').onchange = () => LS.set('lang', $('lang').value);
@@ -319,6 +327,10 @@ function dialogText(turns, names){
   return turns.map(t=>`[${fmt(t.start)}] ${t.r==='O'?names.O:names.C}: ${t.t}`).join('\n');
 }
 
+function rulesBlock(){
+  const r = (LS.get('rules', DEFAULT_RULES)||'').trim();
+  return r ? `\nПРАВИЛА КОМПАНИИ (обязательны). Нарушение правила оператором — это ошибка: укажи её в mistakes со ссылкой на правило. Все советы, «better», «best_response», «phrase» и «script» должны строго соблюдать эти правила (никогда не предлагай то, что они запрещают):\n${r}\n` : '';
+}
 const T = {
   ru:{O:'Оператор',C:'Клиент',title:'РАЗБОР ЗВОНКА',score:'Оценка',outcome:'Итог',stages:'Этапы продажи',strengths:'Что получилось',mistakes:'Ошибки оператора',noMistakes:'Явных ошибок нет',better:'Лучше',objections:'Возражения клиента',noObj:'Возражений не было',op:'Оператор',strong:'Сильный ответ',recs:'Рекомендации',script:'Улучшенный скрипт',dialog:'ДИАЛОГ',lang:'русском',sum:'Сводный разбор оператора',calls:'звонков',avg:'Средняя оценка',rec:'Повторяющиеся ошибки',where:'Где',fix:'Как исправить',phrase:'Фраза',objs:'Типичные возражения',often:'Как часто',prio:'Главные приоритеты',plan:'План тренировки',perCall:'Оценки по звонкам',
       stageNames:'Приветствие и контакт|Выявление потребностей|Презентация|Работа с возражениями|Закрытие/следующий шаг',verdicts:'хорошо|частично|плохо'},
@@ -331,7 +343,8 @@ async function analyze(turns, language, lang){
   const ctx = $('context').value ? `Оператор продаёт: ${$('context').value}.\n` : '';
   const sys = `Ты — опытный тренер по продажам и отработке возражений. Проанализируй звонок оператора с клиентом.
 ВЕСЬ отчёт пиши строго на языке: ${t.lang} — все пояснения, названия этапов, оценки, советы. Готовые фразы для оператора ("better", "better_response", "script") пиши на языке самого звонка${language?` (${language})`:''}, чтобы их можно было сразу использовать.
-Будь конкретным: опирайся на цитаты из разговора, не выдумывай того, чего не было.${lang==='es'?' Обращайся к оператору на «tú», доброжелательно, как тренер.':''}
+Будь конкретным: опирайся на цитаты из разговора, не выдумывай того, чего не было.
+${rulesBlock()}${lang==='es'?' Обращайся к оператору на «tú», доброжелательно, как тренер.':''}
 Верни JSON:
 {"summary":"суть звонка в 2-3 предложениях",
 "outcome":"чем закончился звонок",
@@ -384,6 +397,7 @@ async function summarize(calls, lang){
   status(lang==='es'?'Готовлю сводный отчёт на испанском…':'Готовлю сводный разбор по всем звонкам…', 92);
   const brief = calls.map((c,i)=>({call:i+1, name:c.name, score:c.report.score, outcome:c.report.outcome, stages:c.report.stages, strengths:c.report.strengths, mistakes:c.report.mistakes, objections:c.report.objections, recommendations:c.report.recommendations}));
   const sys = `Ты — опытный тренер по продажам. Ниже разборы нескольких звонков ОДНОГО оператора. Сделай сводный разбор: найди закономерности, повторяющиеся ошибки и сильные стороны, а не пересказывай каждый звонок.
+${rulesBlock()}
 ВЕСЬ отчёт пиши строго на языке: ${t.lang}. Готовые фразы для оператора ("phrase", "best_response") — на языке звонков.${lang==='es'?' Обращайся к оператору на «tú», доброжелательно.':''}
 Верни JSON:
 {"overview":"общая картина в 2-3 предложениях",
