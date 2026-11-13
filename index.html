@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v24</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v25</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -139,6 +139,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
       <button id="btnCopy">📋 Копировать всё</button>
       <button id="btnDownload">⬇️ Скачать .txt</button>
       <button id="btnSwap">🔄 Поменять роли местами</button>
+      <button id="btnRedo" title="Заново разобрать по текущим правилам и скриптам продуктов">♻️ Разобрать заново</button>
     </div>
   </div>
 
@@ -673,6 +674,23 @@ async function reanalyze(){
   current.reports[lang] = current.report;
   saveHistory(current); render(current);
 }
+$('btnRedo').onclick = async () => {
+  if(!current) return;
+  if(current.multi){
+    const h = LS.get('history',[]); const lang = current.lang||'ru';
+    for(let i=0;i<current.calls.length;i++){
+      const cc = current.calls[i], item = h.find(x => x.id===cc.id);
+      if(!item || !item.turns || !item.turns.length) continue;
+      status(`Разбираю заново звонок ${i+1} из ${current.calls.length}…`, 10+70*i/current.calls.length);
+      try{
+        const rep = await analyze(item.turns, item.language, lang, lineOf(item), item.result);
+        item.report = rep; item.lang = lang; item.reports = {[lang]:rep}; saveHistory(item);
+        cc.report = rep; cc.score = rep.score;
+      }catch(e){}
+    }
+  }
+  current.reports = {}; await reanalyze();
+};
 $('btnSwap').onclick = async () => {
   if(!current) return;
   current.turns.forEach(t => t.r = t.r==='O'?'C':'O'); current.reports = {};
