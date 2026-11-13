@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v14</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v15</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -102,9 +102,11 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
         <select id="lang"><option value="">Определить автоматически</option><option value="es">Испанский</option><option value="ru">Русский</option><option value="en">Английский</option></select></div>
       <div><label>Линия / группа</label>
         <select id="line"><option value="ol">Общая линия (ОЛ, первая)</option><option value="base">Вторая линия — «База»</option><option value="fiz">Вторая линия — «Физика»</option></select></div>
-      <div><label>Оператор (звонки сохраняются в его папку)</label>
+      <div><label>Оператор (своя папка)</label>
         <div style="display:flex;gap:8px"><input id="operator" list="opList" placeholder="Имя оператора, напр. María"><button id="btnNewOp" title="Начать нового оператора" style="white-space:nowrap">➕ Новый</button></div>
         <datalist id="opList"></datalist></div>
+      <div><label>Итог звонка</label>
+        <select id="crmres"><option value="ok">✅ Подтверждение</option><option value="no">❌ Отказ</option><option value="">Не знаю / другое</option></select></div>
     </div>
     <div class="drop" id="drop">
       <b>Перетащите сюда запись звонка или сразу несколько</b>
@@ -263,7 +265,7 @@ async function chatJSON(system, user){
     }catch(e){
       lastErr = e;
       if(/does not exist|not have access|decommissioned|not found|not supported|лимит/i.test(e.message)){ badModels.add(model); continue; }
-      if(/json|Unexpected/i.test(e.message)) continue;
+      if(/json|Unexpected|too large|reduce|context|tokens per minute|TPM/i.test(e.message)) continue;
       throw e;
     }
   }
@@ -315,21 +317,29 @@ async function transcribe(file){
 }
 
 const ROLE_PROMPT = `Ты получаешь расшифровку телефонного звонка продаж, разбитую на пронумерованные фрагменты [номер|время]. Определи, кто говорит: "O" — оператор/продавец (звонит или отвечает от компании, представляется, презентует, задаёт квалифицирующие вопросы), "C" — клиент.
-Если во фрагменте говорят оба, раздели его на реплики. Исправь только очевидные ошибки распознавания, смысл не меняй, язык оригинала сохраняй.
+Верни КАЖДЫЙ фрагмент, ни одного не пропускай и не сокращай текст, даже если звонок длинный. Не объединяй разные фрагменты в одну реплику (у каждой реплики свой номер фрагмента). Если во фрагменте говорят оба, раздели его на реплики с тем же номером. Исправь только очевидные ошибки распознавания, смысл не меняй, язык оригинала сохраняй.
 Верни JSON: {"turns":[{"r":"O"|"C","s":номер_фрагмента,"t":"текст реплики"}]}`;
 
 async function assignRoles(segs){
   const lines = segs.map((s,i)=>`[${i}|${fmt(s.start)}] ${s.text}`);
   const chunks = []; let cur = [];
-  lines.forEach(l => { if(cur.join('\n').length + l.length > 9000 && cur.length){ chunks.push(cur); cur=[]; } cur.push(l); });
+  lines.forEach(l => { if(cur.join('\n').length + l.length > 3500 && cur.length){ chunks.push(cur); cur=[]; } cur.push(l); });
   if(cur.length) chunks.push(cur);
   const turns = [];
   for(let i=0;i<chunks.length;i++){
     status(`Разделяю по ролям${chunks.length>1?` (${i+1}/${chunks.length})`:''}…`, 55+20*i/chunks.length);
     const prev = turns.slice(-4).map(t=>`${t.r}: ${t.t}`).join('\n');
     const ctx = $('context').value ? `Контекст: оператор продаёт — ${$('context').value}.\n` : '';
-    const res = await chatJSON(ROLE_PROMPT, ctx + (prev?`Последние реплики перед этим куском (для контекста, не включай их):\n${prev}\n\n`:'') + chunks[i].join('\n'));
-    (res.turns||[]).forEach(t => {
+    let res = {turns:[]};
+    try{ res = await chatJSON(ROLE_PROMPT, ctx + (prev?`Последние реплики перед этим куском (для контекста, не включай их):\n${prev}\n\n`:'') + chunks[i].join('\n')); }catch(e){}
+    // проверка, что ни один фрагмент не потерялся: пропущенные вставляем с ролью соседней реплики
+    const idx = chunks[i].map(l => +l.slice(1, l.indexOf('|')));
+    const out = [];
+    let lastR = (turns[turns.length-1]||{}).r || 'O';
+    const byS = {}; (res.turns||[]).forEach(t => { (byS[+t.s] = byS[+t.s]||[]).push(t); });
+    idx.forEach(n => { if(byS[n]) byS[n].forEach(t => { out.push(t); lastR = t.r; }); else out.push({r:lastR, s:n, t:segs[n].text}); });
+    (res.turns||[]).filter(t => !idx.includes(+t.s)).forEach(t => out.push(t));
+    out.forEach(t => {
       const seg = segs[t.s] || segs[0];
       const r = t.r==='C'?'C':'O', last = turns[turns.length-1];
       if(last && last.r===r) last.t += ' ' + t.t; else turns.push({r, t:t.t, start:seg?seg.start:0});
@@ -393,6 +403,8 @@ const LINES = {
 РУЧНОЙ НАБОР: отказ от перезвона, активация купона или новый заказ по просьбе клиента.
 ОТЛОЖЕННАЯ ДОСТАВКА (более 4 дней): согласовать сумму, продукты и упаковки, записать адрес; при постобработке — заказ в Отказ, комментарий «Не трогать, этот заказ [имя оператора]», телефония «Не звонить»; при повторном подтверждении — ссылка от СВ, звонок клиенту, при «да» СВ подтверждает заказ на оператора.`}
 };
+const RES = {ok:{ru:'✅ Подтверждение',es:'✅ Confirmado'}, no:{ru:'❌ Отказ',es:'❌ Rechazo'}};
+const resPill = (c,lang) => c && RES[c.result] ? ` <span class="pill ${c.result==='no'?'bad':''}">${RES[c.result][lang||'ru']}</span>` : '';
 const lineOf = c => (c && c.line) || $('line').value || 'ol';
 const T = {
   ru:{O:'Оператор',C:'Клиент',title:'РАЗБОР ЗВОНКА',score:'Оценка',outcome:'Итог',stages:'Этапы продажи',strengths:'Что получилось',mistakes:'Ошибки оператора',noMistakes:'Явных ошибок нет',better:'Лучше',objections:'Возражения клиента',noObj:'Возражений не было',op:'Оператор',strong:'Сильный ответ',recs:'Рекомендации',script:'Улучшенный скрипт',dialog:'ДИАЛОГ',lang:'русском',resume:'Резюме звонка',resumes:'Резюме по каждому звонку',overall:'Общее резюме по всем звонкам',sum:'Сводный разбор оператора',calls:'звонков',avg:'Средняя оценка',rec:'Повторяющиеся ошибки',where:'Где',fix:'Как исправить',phrase:'Фраза',objs:'Типичные возражения',often:'Как часто',prio:'Главные приоритеты',plan:'План тренировки',perCall:'Оценки по звонкам',
@@ -400,13 +412,14 @@ const T = {
   es:{O:'Operador',C:'Cliente',title:'ANÁLISIS DE LA LLAMADA',score:'Puntuación',outcome:'Resultado',stages:'Etapas de la venta',strengths:'Lo que hiciste bien',mistakes:'Errores del operador',noMistakes:'Sin errores evidentes',better:'Mejor así',objections:'Objeciones del cliente',noObj:'No hubo objeciones',op:'Operador',strong:'Respuesta recomendada',recs:'Recomendaciones',script:'Guion mejorado',dialog:'DIÁLOGO',lang:'español',resume:'Resumen de la llamada',resumes:'Resumen de cada llamada',overall:'Resumen general de todas las llamadas',sum:'Análisis global del operador',calls:'llamadas',avg:'Puntuación media',rec:'Errores que se repiten',where:'Dónde',fix:'Cómo corregirlo',phrase:'Frase',objs:'Objeciones típicas',often:'Frecuencia',prio:'Prioridades principales',plan:'Plan de entrenamiento',perCall:'Puntuación por llamada',
       stageNames:'Saludo y contacto|Detección de necesidades|Presentación|Manejo de objeciones|Cierre / siguiente paso',verdicts:'bien|parcial|mal'}
 };
-async function analyze(turns, language, lang, line){
+async function analyze(turns, language, lang, line, result){
   lang = lang || LS.get('reportLang','ru'); const t = T[lang]; const L = LINES[line||'ol'];
   status(lang==='es'?'Готовлю отчёт на испанском…':'Анализирую разговор и готовлю рекомендации…', 82);
   const ctx = $('context').value ? `Оператор продаёт: ${$('context').value}.\n` : '';
   const sys = `Ты — опытный тренер по продажам и отработке возражений. Проанализируй звонок оператора с клиентом.
 ВЕСЬ отчёт пиши строго на языке: ${t.lang} — все пояснения, названия этапов, оценки, советы. Готовые фразы для оператора ("better", "better_response", "script") пиши на языке самого звонка${language?` (${language})`:''}, чтобы их можно было сразу использовать.
-Будь конкретным: опирайся на цитаты из разговора, не выдумывай того, чего не было.
+Будь конкретным: опирайся на цитаты из разговора, не выдумывай того, чего не было. Разбирай звонок целиком, до последней реплики, даже если он длинный.
+ЗАПРЕЩЕНО НА ВСЕХ ЛИНИЯХ: в начале разговора спрашивать клиента, удобно ли ему говорить («¿Le viene bien hablar?», «¿Tiene un momento?», «¿Puede hablar ahora?», «удобно ли вам говорить» и любые похожие). Если оператор так спросил — это ошибка в "mistakes" с цитатой.
 ${rulesBlock()}
 ЛИНИЯ И ЭТАПЫ ПРОДАЖ: ${L.rules}
 Оценивай звонок именно по этим этапам: в "stages" перечисли ВСЕ этапы этой линии в указанном порядке (даже если этап пропущен — тогда низкая оценка и пометка «пропущен»).${lang==='es'?' Обращайся к оператору на «tú», доброжелательно, как тренер.':''}
@@ -427,7 +440,22 @@ ${L.regs?`"crm_status":"какой статус по регламенту нуж
 "objections":[{"objection":"возражение клиента","operator_response":"как ответил оператор","verdict":"${t.verdicts}","better_response":"сильный ответ по технике (присоединение, уточнение, аргумент, вопрос-закрытие)"}],
 "recommendations":["конкретные советы оператору на следующий звонок"],
 "script":"короткий улучшенный вариант ключевого момента звонка"}`;
-  return chatJSON(sys, ctx + dialogText(turns, {O:'Оператор', C:'Клиент'}));
+  const resTxt = result==='ok' ? 'Оператор поставил этому звонку статус ПОДТВЕРЖДЕНИЕ (заказ подтверждён). Проверь, правильно ли это по правилам.\n' : result==='no' ? 'Оператор поставил этому звонку статус ОТКАЗ. Проверь, правильно ли это по правилам (не должен ли быть Дубль, Перезвон и т.п.) и не слил ли оператор заказ.\n' : '';
+  const dlg = dialogText(turns, {O:'Оператор', C:'Клиент'});
+  const rep = await chatJSON(sys, ctx + resTxt + 'Разбери ВЕСЬ разговор от начала до конца, включая его конец.\n' + dlg);
+  // если модель что-то пропустила (бывает на длинных звонках) — дозапрашиваем недостающие блоки
+  const empty = k => !rep[k] || (Array.isArray(rep[k]) && !rep[k].length);
+  const miss = ['strengths','mistakes','recommendations','script','summary'].filter(empty);
+  if(miss.length){
+    status(lang==='es'?'Дописываю рекомендации на испанском…':'Дописываю рекомендации…', 90);
+    try{
+      const add = await chatJSON(`Ты — тренер по продажам. Пиши строго на языке: ${t.lang}; готовые фразы для оператора — на языке звонка. ${rulesBlock()}
+ЛИНИЯ: ${L.rules}
+По всему разговору (от начала до конца) верни JSON только с полями: {"summary":"резюме звонка 3-4 предложения","strengths":["что оператор сделал хорошо, с цитатами"],"mistakes":[{"quote":"цитата оператора","problem":"в чём ошибка","better":"как сказать лучше"}],"recommendations":["минимум 4 конкретных совета оператору"],"script":"улучшенный вариант ключевого момента"}. Ни одно поле не оставляй пустым (если ошибок нет — так и напиши в recommendations).`, ctx + resTxt + dlg);
+      miss.forEach(k => { if(add[k] && (!Array.isArray(add[k]) || add[k].length)) rep[k] = add[k]; });
+    }catch(e){}
+  }
+  return rep;
 }
 
 async function run(file, prefix, many){
@@ -440,9 +468,9 @@ async function run(file, prefix, many){
     const turns = await assignRoles(segs);
     let report = null;
     const lang = LS.get('reportLang','ru');
-    const line = $('line').value;
-    try{ report = await analyze(turns, language, lang, line); }catch(e){ report = {error:e.message}; }
-    current = {id:Date.now(), operator:opName(), line, name:file.name, date:new Date().toLocaleString('ru-RU'), language, turns, report, lang, reports:{[lang]:report}};
+    const line = $('line').value, result = $('crmres').value;
+    try{ report = await analyze(turns, language, lang, line, result); }catch(e){ report = {error:e.message}; }
+    current = {id:Date.now(), operator:opName(), line, result, name:file.name, date:new Date().toLocaleString('ru-RU'), language, turns, report, lang, reports:{[lang]:report}};
     saveHistory(current); if(!many) render(current);
     status(`Готово за ${Math.round((Date.now()-t0)/1000)} сек.`, 100);
     return current;
@@ -504,7 +532,7 @@ function render(c){
   $('tab-report').innerHTML = `
     <div class="row" style="align-items:center">
       <div style="flex:0 0 auto"><div class="score">${esc(r.score??'—')}<span class="muted" style="font-size:16px">/10</span></div></div>
-      <div><span class="pill">${esc(LINES[lineOf(c)].short)}</span> <b>${t.outcome}:</b> ${esc(r.outcome)}${r.sale?`<br><b>💶 ${lang==='es'?'Venta':'Продажа'}:</b> ${esc(r.sale)}`:''}${r.check_note?`<br><span class="muted">${esc(r.check_note)}</span>`:''}${r.status_audit&&r.status_audit.correct?`<br><b class="${r.status_audit.ok===false?'bad':''}">${r.status_audit.ok===false?'⚠️':'🏷️'} ${lang==='es'?'Estado correcto':'Правильный статус'}: ${esc(r.status_audit.correct)}</b>${r.status_audit.ok===false?` <span class="muted">(${lang==='es'?'de hecho':'по факту'}: ${esc(r.status_audit.actual)})</span>`:''}${r.status_audit.reason?`<br><span class="muted">${esc(r.status_audit.reason)}</span>`:''}`:''}${r.crm_status?`<br><b>🏷️ ${lang==='es'?'Estado en CRM':'Статус в CRM'}:</b> ${esc(r.crm_status)}`:''}${r.drain&&!/^(нет|no)\b/i.test(r.drain)?`<br><b class="bad">⚠️ ${lang==='es'?'Pérdida del pedido':'Слив заказа'}:</b> ${esc(r.drain)}`:''}${r.trap_words&&!/^(нет|no)\b/i.test(r.trap_words)?`<br><span class="muted">${lang==='es'?'Palabras trampa':'Слова-ловушки'}: ${esc(r.trap_words)}</span>`:''}</div>
+      <div><span class="pill">${esc(LINES[lineOf(c)].short)}</span>${resPill(c,lang)} <b>${t.outcome}:</b> ${esc(r.outcome)}${r.sale?`<br><b>💶 ${lang==='es'?'Venta':'Продажа'}:</b> ${esc(r.sale)}`:''}${r.check_note?`<br><span class="muted">${esc(r.check_note)}</span>`:''}${r.status_audit&&r.status_audit.correct?`<br><b class="${r.status_audit.ok===false?'bad':''}">${r.status_audit.ok===false?'⚠️':'🏷️'} ${lang==='es'?'Estado correcto':'Правильный статус'}: ${esc(r.status_audit.correct)}</b>${r.status_audit.ok===false?` <span class="muted">(${lang==='es'?'de hecho':'по факту'}: ${esc(r.status_audit.actual)})</span>`:''}${r.status_audit.reason?`<br><span class="muted">${esc(r.status_audit.reason)}</span>`:''}`:''}${r.crm_status?`<br><b>🏷️ ${lang==='es'?'Estado en CRM':'Статус в CRM'}:</b> ${esc(r.crm_status)}`:''}${r.drain&&!/^(нет|no)\b/i.test(r.drain)?`<br><b class="bad">⚠️ ${lang==='es'?'Pérdida del pedido':'Слив заказа'}:</b> ${esc(r.drain)}`:''}${r.trap_words&&!/^(нет|no)\b/i.test(r.trap_words)?`<br><span class="muted">${lang==='es'?'Palabras trampa':'Слова-ловушки'}: ${esc(r.trap_words)}</span>`:''}</div>
     </div>
     <h3>📄 ${t.resume}</h3><div class="item">${esc(r.summary)}</div>
     ${(r.stages||[]).length?`<h3>${t.stages}</h3>`+r.stages.map(x=>`<div class="item"><span class="pill">${esc(x.score)}/10</span> <b>${esc(x.name)}</b> — ${esc(x.comment)}</div>`).join(''):''}
@@ -555,7 +583,7 @@ document.querySelectorAll('.tabs button[data-tab]').forEach(b => b.onclick = () 
 async function reanalyze(){
   if(!current) return;
   const lang = current.lang||'ru'; current.reports = current.reports||{};
-  try{ current.report = current.multi ? await summarize(current.calls, lang, lineOf(current)) : await analyze(current.turns, current.language, lang, lineOf(current)); status('Готово.',100); }
+  try{ current.report = current.multi ? await summarize(current.calls, lang, lineOf(current)) : await analyze(current.turns, current.language, lang, lineOf(current), current.result); status('Готово.',100); }
   catch(e){ current.report = {error:e.message}; }
   current.reports[lang] = current.report;
   saveHistory(current); render(current);
@@ -584,7 +612,7 @@ function plainText(c){
   const r = c.report||{}, t = T[c.lang||'ru'], L = [];
   L.push(`${t.title}: ${c.name} (${c.date})`, '');
   if(!r.error){
-    L.push(LINES[lineOf(c)].name, `${t.score}: ${r.score}/10`, `${t.outcome}: ${r.outcome}`, ...(r.sale?[`💶 ${r.sale}`]:[]), ...(r.check_note?[r.check_note]:[]), ...(r.status_audit&&r.status_audit.correct?[`${r.status_audit.ok===false?'⚠️':'🏷️'} ${c.lang==='es'?'Estado correcto':'Правильный статус'}: ${r.status_audit.correct}${r.status_audit.ok===false?' ('+(c.lang==='es'?'de hecho':'по факту')+': '+r.status_audit.actual+')':''}${r.status_audit.reason?' — '+r.status_audit.reason:''}`]:[]), ...(r.crm_status?['🏷️ CRM: '+r.crm_status]:[]), ...(r.drain&&!/^(нет|no)\b/i.test(r.drain)?['⚠️ '+r.drain]:[]), '', '📄 '+t.resume.toUpperCase()+':', r.summary||'', '');
+    L.push(LINES[lineOf(c)].name + (RES[c.result]?' · '+RES[c.result][c.lang||'ru']:''), `${t.score}: ${r.score}/10`, `${t.outcome}: ${r.outcome}`, ...(r.sale?[`💶 ${r.sale}`]:[]), ...(r.check_note?[r.check_note]:[]), ...(r.status_audit&&r.status_audit.correct?[`${r.status_audit.ok===false?'⚠️':'🏷️'} ${c.lang==='es'?'Estado correcto':'Правильный статус'}: ${r.status_audit.correct}${r.status_audit.ok===false?' ('+(c.lang==='es'?'de hecho':'по факту')+': '+r.status_audit.actual+')':''}${r.status_audit.reason?' — '+r.status_audit.reason:''}`]:[]), ...(r.crm_status?['🏷️ CRM: '+r.crm_status]:[]), ...(r.drain&&!/^(нет|no)\b/i.test(r.drain)?['⚠️ '+r.drain]:[]), '', '📄 '+t.resume.toUpperCase()+':', r.summary||'', '');
     if((r.checklist||[]).length){ L.push((c.lang==='es'?'REGLAMENTO':'ЧЕК-ЛИСТ РЕГЛАМЕНТА')+':'); r.checklist.forEach(x=>L.push(`${x.ok===true?'✅':x.ok===false?'❌':'➖'} ${x.item}${x.comment?' — '+x.comment:''}`)); L.push(''); }
     if((r.stages||[]).length){ L.push(t.stages.toUpperCase()+':'); r.stages.forEach(x=>L.push(`- ${x.name}: ${x.score}/10 — ${x.comment}`)); }
     L.push('', '✅ '+t.strengths.toUpperCase()+':', ...(r.strengths||[]).map(x=>'- '+x));
@@ -613,7 +641,7 @@ function saveHistory(c){
   renderHistory();
 }
 function histRow(x){
-  return `<div class="row-wrap"><a data-id="${x.id}"><span>${x.multi?'📊 ':''}${esc(x.name)}</span><span class="muted">${esc(x.report&&x.report.score!=null?x.report.score+'/10 · ':'')}${esc(x.date)}</span></a><button class="del" data-del="${x.id}" title="Удалить">✕</button></div>`;
+  return `<div class="row-wrap"><a data-id="${x.id}"><span>${x.multi?'📊 ':''}${RES[x.result]?(x.result==='ok'?'✅ ':'❌ '):''}${esc(x.name)}</span><span class="muted">${esc(x.report&&x.report.score!=null?x.report.score+'/10 · ':'')}${esc(x.date)}</span></a><button class="del" data-del="${x.id}" title="Удалить">✕</button></div>`;
 }
 function removeWhere(fn, question){
   const h = LS.get('history',[]); const n = h.filter(fn).length;
