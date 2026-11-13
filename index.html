@@ -60,7 +60,7 @@ ul{margin:6px 0;padding-left:20px}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v2</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v4</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -93,9 +93,9 @@ ul{margin:6px 0;padding-left:20px}
         <select id="lang"><option value="">Определить автоматически</option><option value="es">Испанский</option><option value="ru">Русский</option><option value="en">Английский</option></select></div>
     </div>
     <div class="drop" id="drop">
-      <b>Перетащите запись звонка сюда</b>
-      <span class="muted">или нажмите, чтобы выбрать файл · mp3, m4a, wav, ogg, mp4, webm</span>
-      <input type="file" id="file" accept="audio/*,video/*" hidden>
+      <b>Перетащите сюда запись звонка или сразу несколько</b>
+      <span class="muted">или нажмите, чтобы выбрать файлы · несколько звонков одного оператора = сводный разбор · mp3, m4a, wav, ogg, mp4, webm</span>
+      <input type="file" id="file" accept="audio/*,video/*" multiple hidden>
     </div>
     <div class="status hidden" id="status"><span id="statusText"></span><div class="bar"><i id="barFill"></i></div></div>
   </div>
@@ -104,6 +104,9 @@ ul{margin:6px 0;padding-left:20px}
     <div class="tabs">
       <button data-tab="report" class="on">Рекомендации</button>
       <button data-tab="dialog">Диалог</button>
+      <span style="flex:1"></span>
+      <button data-lang="ru">🇷🇺 Русский</button>
+      <button data-lang="es">🇪🇸 Español (для оператора)</button>
     </div>
     <div id="tab-report"></div>
     <div id="tab-dialog" class="hidden"></div>
@@ -160,10 +163,10 @@ const fmt = t => { t=Math.max(0,Math.round(t||0)); return Math.floor(t/60)+':'+S
 /* ---------- file input ---------- */
 const drop = $('drop');
 drop.onclick = () => $('file').click();
-$('file').onchange = e => e.target.files[0] && run(e.target.files[0]);
+$('file').onchange = e => e.target.files.length && runMany([...e.target.files]);
 ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
-drop.addEventListener('drop', e => e.dataTransfer.files[0] && run(e.dataTransfer.files[0]));
+drop.addEventListener('drop', e => e.dataTransfer.files.length && runMany([...e.dataTransfer.files]));
 
 /* ---------- groq calls ---------- */
 async function groq(path, body, isForm){
@@ -300,27 +303,34 @@ function dialogText(turns, names){
   return turns.map(t=>`[${fmt(t.start)}] ${t.r==='O'?names.O:names.C}: ${t.t}`).join('\n');
 }
 
-async function analyze(turns, language){
-  status('Анализирую разговор и готовлю рекомендации…', 82);
-  const rl = LS.get('reportLang','ru')==='es' ? 'испанском' : 'русском';
+const T = {
+  ru:{O:'Оператор',C:'Клиент',title:'РАЗБОР ЗВОНКА',score:'Оценка',outcome:'Итог',stages:'Этапы продажи',strengths:'Что получилось',mistakes:'Ошибки оператора',noMistakes:'Явных ошибок нет',better:'Лучше',objections:'Возражения клиента',noObj:'Возражений не было',op:'Оператор',strong:'Сильный ответ',recs:'Рекомендации',script:'Улучшенный скрипт',dialog:'ДИАЛОГ',lang:'русском',sum:'Сводный разбор оператора',calls:'звонков',avg:'Средняя оценка',rec:'Повторяющиеся ошибки',where:'Где',fix:'Как исправить',phrase:'Фраза',objs:'Типичные возражения',often:'Как часто',prio:'Главные приоритеты',plan:'План тренировки',perCall:'Оценки по звонкам',
+      stageNames:'Приветствие и контакт|Выявление потребностей|Презентация|Работа с возражениями|Закрытие/следующий шаг',verdicts:'хорошо|частично|плохо'},
+  es:{O:'Operador',C:'Cliente',title:'ANÁLISIS DE LA LLAMADA',score:'Puntuación',outcome:'Resultado',stages:'Etapas de la venta',strengths:'Lo que hiciste bien',mistakes:'Errores del operador',noMistakes:'Sin errores evidentes',better:'Mejor así',objections:'Objeciones del cliente',noObj:'No hubo objeciones',op:'Operador',strong:'Respuesta recomendada',recs:'Recomendaciones',script:'Guion mejorado',dialog:'DIÁLOGO',lang:'español',sum:'Análisis global del operador',calls:'llamadas',avg:'Puntuación media',rec:'Errores que se repiten',where:'Dónde',fix:'Cómo corregirlo',phrase:'Frase',objs:'Objeciones típicas',often:'Frecuencia',prio:'Prioridades principales',plan:'Plan de entrenamiento',perCall:'Puntuación por llamada',
+      stageNames:'Saludo y contacto|Detección de necesidades|Presentación|Manejo de objeciones|Cierre / siguiente paso',verdicts:'bien|parcial|mal'}
+};
+async function analyze(turns, language, lang){
+  lang = lang || LS.get('reportLang','ru'); const t = T[lang];
+  status(lang==='es'?'Готовлю отчёт на испанском…':'Анализирую разговор и готовлю рекомендации…', 82);
   const ctx = $('context').value ? `Оператор продаёт: ${$('context').value}.\n` : '';
   const sys = `Ты — опытный тренер по продажам и отработке возражений. Проанализируй звонок оператора с клиентом.
-Пиши пояснения на ${rl} языке. Готовые фразы для оператора ("better", "better_response", "script") пиши на языке самого звонка${language?` (${language})`:''}, чтобы их можно было сразу использовать.
-Будь конкретным: опирайся на цитаты из разговора, не выдумывай того, чего не было.
+ВЕСЬ отчёт пиши строго на языке: ${t.lang} — все пояснения, названия этапов, оценки, советы. Готовые фразы для оператора ("better", "better_response", "script") пиши на языке самого звонка${language?` (${language})`:''}, чтобы их можно было сразу использовать.
+Будь конкретным: опирайся на цитаты из разговора, не выдумывай того, чего не было.${lang==='es'?' Обращайся к оператору на «tú», доброжелательно, как тренер.':''}
 Верни JSON:
 {"summary":"суть звонка в 2-3 предложениях",
 "outcome":"чем закончился звонок",
 "score":число 1-10,
-"stages":[{"name":"Приветствие и контакт|Выявление потребностей|Презентация|Работа с возражениями|Закрытие/следующий шаг","score":1-10,"comment":"коротко"}],
+"stages":[{"name":"${t.stageNames}","score":1-10,"comment":"коротко"}],
 "strengths":["что оператор сделал хорошо"],
 "mistakes":[{"quote":"цитата оператора","problem":"в чём ошибка","better":"как сказать лучше"}],
-"objections":[{"objection":"возражение клиента","operator_response":"как ответил оператор","verdict":"хорошо|частично|плохо","better_response":"сильный ответ по технике (присоединение, уточнение, аргумент, вопрос-закрытие)"}],
+"objections":[{"objection":"возражение клиента","operator_response":"как ответил оператор","verdict":"${t.verdicts}","better_response":"сильный ответ по технике (присоединение, уточнение, аргумент, вопрос-закрытие)"}],
 "recommendations":["конкретные советы оператору на следующий звонок"],
 "script":"короткий улучшенный вариант ключевого момента звонка"}`;
   return chatJSON(sys, ctx + dialogText(turns, {O:'Оператор', C:'Клиент'}));
 }
 
-async function run(file){
+async function run(file, prefix, many){
+  prefix = prefix||''; const _st = status; if(prefix) status = (txt,p)=>_st(prefix+txt,p);
   drop.style.pointerEvents='none';
   try{
     const t0 = Date.now();
@@ -328,66 +338,144 @@ async function run(file){
     if(!segs.length) throw new Error('В записи не найдено речи.');
     const turns = await assignRoles(segs);
     let report = null;
-    try{ report = await analyze(turns, language); }catch(e){ report = {error:e.message}; }
-    current = {id:Date.now(), name:file.name, date:new Date().toLocaleString('ru-RU'), language, turns, report};
-    saveHistory(current); render(current);
+    const lang = LS.get('reportLang','ru');
+    try{ report = await analyze(turns, language, lang); }catch(e){ report = {error:e.message}; }
+    current = {id:Date.now(), name:file.name, date:new Date().toLocaleString('ru-RU'), language, turns, report, lang, reports:{[lang]:report}};
+    saveHistory(current); if(!many) render(current);
     status(`Готово за ${Math.round((Date.now()-t0)/1000)} сек.`, 100);
-  }catch(e){ status('⚠️ '+e.message, 0); }
-  finally{ drop.style.pointerEvents=''; $('file').value=''; }
+    return current;
+  }catch(e){ status('⚠️ '+e.message, 0); if(many) return {name:file.name, report:{error:e.message}}; }
+  finally{ status = _st; drop.style.pointerEvents=''; $('file').value=''; }
+}
+
+async function runMany(files){
+  if(files.length===1) return run(files[0]);
+  const t0 = Date.now(), items = [];
+  for(let i=0;i<files.length;i++) items.push(await run(files[i], `Звонок ${i+1} из ${files.length}: `, true));
+  const ok = items.filter(x=>x && x.report && !x.report.error);
+  if(!ok.length){ status('⚠️ Ни один звонок не удалось разобрать.',0); return; }
+  const lang = LS.get('reportLang','ru');
+  const calls = ok.map(x=>({id:x.id, name:x.name, score:x.report.score, report:x.report}));
+  let report; try{ report = await summarize(calls, lang); }catch(e){ report = {error:e.message}; }
+  current = {id:Date.now(), multi:true, name:`Сводный разбор · ${ok.length} звонков`, date:new Date().toLocaleString('ru-RU'), calls, report, lang, reports:{[lang]:report}, turns:[]};
+  saveHistory(current); render(current);
+  const failed = items.length-ok.length;
+  status(`Готово за ${Math.round((Date.now()-t0)/1000)} сек.${failed?` Не удалось разобрать: ${failed}.`:''}`, 100);
+}
+
+async function summarize(calls, lang){
+  const t = T[lang||'ru'];
+  status(lang==='es'?'Готовлю сводный отчёт на испанском…':'Готовлю сводный разбор по всем звонкам…', 92);
+  const brief = calls.map((c,i)=>({call:i+1, name:c.name, score:c.report.score, outcome:c.report.outcome, stages:c.report.stages, strengths:c.report.strengths, mistakes:c.report.mistakes, objections:c.report.objections, recommendations:c.report.recommendations}));
+  const sys = `Ты — опытный тренер по продажам. Ниже разборы нескольких звонков ОДНОГО оператора. Сделай сводный разбор: найди закономерности, повторяющиеся ошибки и сильные стороны, а не пересказывай каждый звонок.
+ВЕСЬ отчёт пиши строго на языке: ${t.lang}. Готовые фразы для оператора ("phrase", "best_response") — на языке звонков.${lang==='es'?' Обращайся к оператору на «tú», доброжелательно.':''}
+Верни JSON:
+{"overview":"общая картина в 2-3 предложениях",
+"strengths":["устойчивые сильные стороны"],
+"recurring_mistakes":[{"mistake":"ошибка","where":"в каких звонках (номера)","fix":"как исправить","phrase":"готовая фраза"}],
+"objections":[{"objection":"возражение","how_often":"сколько раз встречалось","best_response":"лучший ответ"}],
+"priorities":["3 главных приоритета на неделю"],
+"training_plan":["конкретные упражнения для тренировки"],
+"per_call":[{"call":номер,"score":1-10,"one_line":"главное по звонку в одну строку"}]}`;
+  return chatJSON(sys, JSON.stringify(brief));
 }
 
 /* ---------- render ---------- */
 function render(c){
+  const lang = c.lang||'ru', t = T[lang];
   $('result').classList.remove('hidden');
+  document.querySelectorAll('[data-lang]').forEach(x=>x.classList.toggle('on', x.dataset.lang===lang));
+  $('btnSwap').classList.toggle('hidden', !!c.multi);
+  document.querySelector('[data-tab=dialog]').textContent = c.multi ? 'Звонки' : 'Диалог';
+  if(c.multi) return renderSummary(c);
   $('tab-dialog').innerHTML = `<p class="muted">${esc(c.name)} · ${esc(c.date)}${c.language?' · '+esc(c.language):''}</p>` +
-    c.turns.map(t=>`<div class="turn ${t.r==='O'?'op':'cl'}"><div class="who">${t.r==='O'?'Оператор':'Клиент'}<small>${fmt(t.start)}</small></div><div class="msg">${esc(t.t)}</div></div>`).join('');
+    c.turns.map(x=>`<div class="turn ${x.r==='O'?'op':'cl'}"><div class="who">${x.r==='O'?t.O:t.C}<small>${fmt(x.start)}</small></div><div class="msg">${esc(x.t)}</div></div>`).join('');
   const r = c.report||{};
   if(r.error){ $('tab-report').innerHTML = `<p class="bad">Анализ не удался: ${esc(r.error)}</p><button onclick="reanalyze()">Повторить анализ</button>`; return; }
   const list = a => (a&&a.length)?'<ul>'+a.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':'<p class="muted">—</p>';
-  const vcol = v => /хорош|bien|good/i.test(v)?'good':(/плох|mal|bad/i.test(v)?'bad':'');
   $('tab-report').innerHTML = `
     <div class="row" style="align-items:center">
       <div style="flex:0 0 auto"><div class="score">${esc(r.score??'—')}<span class="muted" style="font-size:16px">/10</span></div></div>
-      <div><b>Итог:</b> ${esc(r.outcome)}<br><span class="muted">${esc(r.summary)}</span></div>
+      <div><b>${t.outcome}:</b> ${esc(r.outcome)}<br><span class="muted">${esc(r.summary)}</span></div>
     </div>
-    ${(r.stages||[]).length?'<h3>Этапы продажи</h3>'+r.stages.map(s=>`<div class="item"><span class="pill">${esc(s.score)}/10</span> <b>${esc(s.name)}</b> — ${esc(s.comment)}</div>`).join(''):''}
-    <h3>✅ Что получилось</h3>${list(r.strengths)}
-    <h3>❌ Ошибки оператора</h3>${(r.mistakes||[]).map(m=>`<div class="item"><div class="q">«${esc(m.quote)}»</div><div class="bad">${esc(m.problem)}</div><div class="good">Лучше: ${esc(m.better)}</div></div>`).join('')||'<p class="muted">Явных ошибок нет</p>'}
-    <h3>🛡️ Возражения клиента</h3>${(r.objections||[]).map(o=>`<div class="item"><b>${esc(o.objection)}</b> <span class="pill">${esc(o.verdict)}</span><div class="q">Оператор: ${esc(o.operator_response)}</div><div class="good">Сильный ответ: ${esc(o.better_response)}</div></div>`).join('')||'<p class="muted">Возражений не было</p>'}
-    <h3>💡 Рекомендации</h3>${list(r.recommendations)}
-    ${r.script?`<h3>📝 Улучшенный скрипт</h3><div class="item" style="white-space:pre-wrap">${esc(r.script)}</div>`:''}`;
+    ${(r.stages||[]).length?`<h3>${t.stages}</h3>`+r.stages.map(x=>`<div class="item"><span class="pill">${esc(x.score)}/10</span> <b>${esc(x.name)}</b> — ${esc(x.comment)}</div>`).join(''):''}
+    <h3>✅ ${t.strengths}</h3>${list(r.strengths)}
+    <h3>❌ ${t.mistakes}</h3>${(r.mistakes||[]).map(m=>`<div class="item"><div class="q">«${esc(m.quote)}»</div><div class="bad">${esc(m.problem)}</div><div class="good">${t.better}: ${esc(m.better)}</div></div>`).join('')||`<p class="muted">${t.noMistakes}</p>`}
+    <h3>🛡️ ${t.objections}</h3>${(r.objections||[]).map(o=>`<div class="item"><b>${esc(o.objection)}</b> <span class="pill">${esc(o.verdict)}</span><div class="q">${t.op}: ${esc(o.operator_response)}</div><div class="good">${t.strong}: ${esc(o.better_response)}</div></div>`).join('')||`<p class="muted">${t.noObj}</p>`}
+    <h3>💡 ${t.recs}</h3>${list(r.recommendations)}
+    ${r.script?`<h3>📝 ${t.script}</h3><div class="item" style="white-space:pre-wrap">${esc(r.script)}</div>`:''}`;
 }
-document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on', x===b));
+function renderSummary(c){
+  const t = T[c.lang||'ru'], r = c.report||{};
+  const avg = (c.calls.reduce((a,x)=>a+(+x.score||0),0)/c.calls.length).toFixed(1);
+  $('tab-dialog').innerHTML = c.calls.map((x,i)=>`<div class="hist"><a data-open="${x.id}"><span>${i+1}. ${esc(x.name)}</span><span class="muted">${esc(x.score)}/10 →</span></a></div>`).join('') + '<p class="muted">Нажмите на звонок, чтобы открыть его полный разбор и диалог.</p>';
+  $('tab-dialog').querySelectorAll('[data-open]').forEach(a=>a.onclick=()=>{ const h=LS.get('history',[]).find(x=>String(x.id)===a.dataset.open); if(h){ current=h; render(h); } else status('Этот звонок уже удалён из истории.'); });
+  if(r.error){ $('tab-report').innerHTML = `<p class="bad">Сводный анализ не удался: ${esc(r.error)}</p><button onclick="reanalyze()">Повторить</button>`; return; }
+  const list = a => (a&&a.length)?'<ul>'+a.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':'<p class="muted">—</p>';
+  $('tab-report').innerHTML = `
+    <h2>${t.sum} · ${c.calls.length} ${t.calls}</h2>
+    <div class="row" style="align-items:center">
+      <div style="flex:0 0 auto"><div class="score">${avg}<span class="muted" style="font-size:16px">/10</span></div><div class="muted">${t.avg}</div></div>
+      <div>${esc(r.overview)}</div>
+    </div>
+    <h3>${t.perCall}</h3>${(r.per_call||[]).map(x=>`<div class="item"><span class="pill">${esc(x.score)}/10</span> <b>#${esc(x.call)}</b> ${esc((c.calls[x.call-1]||{}).name||'')} — ${esc(x.one_line)}</div>`).join('')}
+    <h3>✅ ${t.strengths}</h3>${list(r.strengths)}
+    <h3>❌ ${t.rec}</h3>${(r.recurring_mistakes||[]).map(m=>`<div class="item"><b class="bad">${esc(m.mistake)}</b> <span class="pill">${t.where}: ${esc(m.where)}</span><div>${t.fix}: ${esc(m.fix)}</div><div class="good">${t.phrase}: ${esc(m.phrase)}</div></div>`).join('')||`<p class="muted">${t.noMistakes}</p>`}
+    <h3>🛡️ ${t.objs}</h3>${(r.objections||[]).map(o=>`<div class="item"><b>${esc(o.objection)}</b> <span class="pill">${t.often}: ${esc(o.how_often)}</span><div class="good">${t.strong}: ${esc(o.best_response)}</div></div>`).join('')||`<p class="muted">${t.noObj}</p>`}
+    <h3>🎯 ${t.prio}</h3>${list(r.priorities)}
+    <h3>🏋️ ${t.plan}</h3>${list(r.training_plan)}`;
+}
+document.querySelectorAll('[data-lang]').forEach(b => b.onclick = async () => {
+  if(!current) return;
+  const lang = b.dataset.lang; current.reports = current.reports || {[current.lang||'ru']:current.report};
+  current.lang = lang;
+  if(current.reports[lang] && !current.reports[lang].error){ current.report = current.reports[lang]; render(current); saveHistory(current); return; }
+  await reanalyze();
+});
+document.querySelectorAll('.tabs button[data-tab]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button[data-tab]').forEach(x=>x.classList.toggle('on', x===b));
   $('tab-report').classList.toggle('hidden', b.dataset.tab!=='report');
   $('tab-dialog').classList.toggle('hidden', b.dataset.tab!=='dialog');
 });
 
 async function reanalyze(){
   if(!current) return;
-  try{ current.report = await analyze(current.turns, current.language); status('Готово.',100); }
+  const lang = current.lang||'ru'; current.reports = current.reports||{};
+  try{ current.report = current.multi ? await summarize(current.calls, lang) : await analyze(current.turns, current.language, lang); status('Готово.',100); }
   catch(e){ current.report = {error:e.message}; }
+  current.reports[lang] = current.report;
   saveHistory(current); render(current);
 }
 $('btnSwap').onclick = async () => {
   if(!current) return;
-  current.turns.forEach(t => t.r = t.r==='O'?'C':'O');
+  current.turns.forEach(t => t.r = t.r==='O'?'C':'O'); current.reports = {};
   render(current); await reanalyze();
 };
 
 function plainText(c){
-  const r = c.report||{}, L = [];
-  L.push(`РАЗБОР ЗВОНКА: ${c.name} (${c.date})`, '');
-  if(!r.error){
-    L.push(`Оценка: ${r.score}/10`, `Итог: ${r.outcome}`, r.summary||'', '');
-    (r.stages||[]).forEach(s=>L.push(`- ${s.name}: ${s.score}/10 — ${s.comment}`));
-    L.push('', 'ЧТО ПОЛУЧИЛОСЬ:', ...(r.strengths||[]).map(x=>'- '+x));
-    L.push('', 'ОШИБКИ:', ...(r.mistakes||[]).map(m=>`- «${m.quote}» — ${m.problem}\n  Лучше: ${m.better}`));
-    L.push('', 'ВОЗРАЖЕНИЯ:', ...(r.objections||[]).map(o=>`- ${o.objection} [${o.verdict}]\n  Оператор: ${o.operator_response}\n  Сильный ответ: ${o.better_response}`));
-    L.push('', 'РЕКОМЕНДАЦИИ:', ...(r.recommendations||[]).map(x=>'- '+x));
-    if(r.script) L.push('', 'СКРИПТ:', r.script);
+  if(c.multi){
+    const r = c.report||{}, t = T[c.lang||'ru'], L = [`${t.sum.toUpperCase()} (${c.calls.length} ${t.calls}, ${c.date})`, ''];
+    if(r.error) return L.join('\n');
+    L.push(r.overview||'', '', t.perCall.toUpperCase()+':', ...(r.per_call||[]).map(x=>`- #${x.call} ${(c.calls[x.call-1]||{}).name||''}: ${x.score}/10 — ${x.one_line}`));
+    L.push('', '✅ '+t.strengths.toUpperCase()+':', ...(r.strengths||[]).map(x=>'- '+x));
+    L.push('', '❌ '+t.rec.toUpperCase()+':', ...(r.recurring_mistakes||[]).map(m=>`- ${m.mistake} (${t.where}: ${m.where})\n  ${t.fix}: ${m.fix}\n  ${t.phrase}: ${m.phrase}`));
+    L.push('', '🛡️ '+t.objs.toUpperCase()+':', ...(r.objections||[]).map(o=>`- ${o.objection} (${t.often}: ${o.how_often})\n  ${t.strong}: ${o.best_response}`));
+    L.push('', '🎯 '+t.prio.toUpperCase()+':', ...(r.priorities||[]).map(x=>'- '+x));
+    L.push('', '🏋️ '+t.plan.toUpperCase()+':', ...(r.training_plan||[]).map(x=>'- '+x));
+    return L.join('\n');
   }
-  L.push('', 'ДИАЛОГ:', dialogText(c.turns, {O:'Оператор', C:'Клиент'}));
+  const r = c.report||{}, t = T[c.lang||'ru'], L = [];
+  L.push(`${t.title}: ${c.name} (${c.date})`, '');
+  if(!r.error){
+    L.push(`${t.score}: ${r.score}/10`, `${t.outcome}: ${r.outcome}`, r.summary||'', '');
+    if((r.stages||[]).length){ L.push(t.stages.toUpperCase()+':'); r.stages.forEach(x=>L.push(`- ${x.name}: ${x.score}/10 — ${x.comment}`)); }
+    L.push('', '✅ '+t.strengths.toUpperCase()+':', ...(r.strengths||[]).map(x=>'- '+x));
+    L.push('', '❌ '+t.mistakes.toUpperCase()+':', ...(r.mistakes||[]).map(m=>`- «${m.quote}» — ${m.problem}\n  ${t.better}: ${m.better}`));
+    L.push('', '🛡️ '+t.objections.toUpperCase()+':', ...(r.objections||[]).map(o=>`- ${o.objection} [${o.verdict}]\n  ${t.op}: ${o.operator_response}\n  ${t.strong}: ${o.better_response}`));
+    L.push('', '💡 '+t.recs.toUpperCase()+':', ...(r.recommendations||[]).map(x=>'- '+x));
+    if(r.script) L.push('', '📝 '+t.script.toUpperCase()+':', r.script);
+  }
+  L.push('', t.dialog+':', dialogText(c.turns, {O:t.O, C:t.C}));
   return L.join('\n');
 }
 $('btnCopy').onclick = () => current && navigator.clipboard.writeText(plainText(current)).then(()=>status('Скопировано.',100));
@@ -395,7 +483,7 @@ $('btnDownload').onclick = () => {
   if(!current) return;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([plainText(current)],{type:'text/plain;charset=utf-8'}));
-  a.download = current.name.replace(/\.[^.]+$/,'')+'_разбор.txt'; a.click();
+  a.download = current.name.replace(/\.[^.]+$/,'')+(current.lang==='es'?'_analisis.txt':'_разбор.txt'); a.click();
 };
 
 /* ---------- history ---------- */
