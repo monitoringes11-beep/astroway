@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Разбор звонков</title>
+<style>
+:root{
+  --bg:#f6f7f9;--card:#fff;--text:#16181d;--muted:#667085;--line:#e4e7ec;
+  --accent:#4f46e5;--accent-soft:#eef2ff;--op:#0e7490;--op-soft:#ecfeff;
+  --cl:#9333ea;--cl-soft:#faf5ff;--ok:#15803d;--bad:#b42318;--warn:#b54708;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#0f1115;--card:#171a21;--text:#e6e8ec;--muted:#98a2b3;--line:#2a2f3a;
+  --accent:#818cf8;--accent-soft:#1e1b4b;--op:#22d3ee;--op-soft:#0b2a31;
+  --cl:#c084fc;--cl-soft:#2a1640;--ok:#4ade80;--bad:#f87171;--warn:#fbbf24;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+h1{font-size:22px;margin:0}
+h2{font-size:17px;margin:0 0 10px}
+h3{font-size:15px;margin:16px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:10px;padding:8px 14px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+input,select{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%}
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>*{flex:1 1 200px}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:34px 16px;text-align:center;cursor:pointer;transition:.15s}
+.drop.over,.drop:hover{border-color:var(--accent);background:var(--accent-soft)}
+.drop b{display:block;font-size:17px;margin-bottom:4px}
+.muted{color:var(--muted);font-size:13px}
+.status{margin-top:14px;font-size:14px}
+.bar{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tabs button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.turn{display:flex;gap:10px;margin:8px 0}
+.who{flex:0 0 92px;font-size:12px;font-weight:700;padding-top:3px}
+.who small{display:block;font-weight:400;color:var(--muted)}
+.msg{flex:1;padding:8px 12px;border-radius:10px}
+.op .who{color:var(--op)}.op .msg{background:var(--op-soft)}
+.cl .who{color:var(--cl)}.cl .msg{background:var(--cl-soft)}
+.score{font-size:40px;font-weight:800;line-height:1}
+.pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:20px;background:var(--accent-soft);color:var(--accent)}
+.item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
+.item .q{font-style:italic;color:var(--muted)}
+.item .bad{color:var(--bad)}.item .good{color:var(--ok)}
+ul{margin:6px 0;padding-left:20px}
+.hist a{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none;cursor:pointer}
+.hidden{display:none}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+@media (max-width:560px){.turn{flex-direction:column;gap:2px}.who{flex:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎧 Разбор звонков</h1>
+    <button id="btnSettings">⚙️ Настройки</button>
+  </header>
+
+  <div class="card hidden" id="settings">
+    <h2>Настройки</h2>
+    <div class="row">
+      <div><label>Бесплатный ключ Groq (хранится только в этом браузере)</label>
+        <input id="apiKey" type="password" placeholder="gsk_..."></div>
+      <div><label>Язык отчёта</label>
+        <select id="reportLang"><option value="ru">Русский</option><option value="es">Español</option></select></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div><label>Модель анализа</label>
+        <select id="model">
+          <option value="llama-3.3-70b-versatile">Llama 3.3 70B (по умолчанию)</option>
+          <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
+          <option value="llama-3.1-8b-instant">Llama 3.1 8B (быстрее, проще)</option>
+        </select></div>
+      <div><label>Что продаёт оператор (необязательно, улучшит советы)</label>
+        <input id="context" placeholder="напр.: курсы английского, тур в Канкун"></div>
+    </div>
+    <p class="muted">Ключ получить бесплатно: <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a></p>
+    <div class="actions"><button class="primary" id="btnSave">Сохранить</button></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <div><label>Язык звонка</label>
+        <select id="lang"><option value="">Определить автоматически</option><option value="es">Испанский</option><option value="ru">Русский</option><option value="en">Английский</option></select></div>
+    </div>
+    <div class="drop" id="drop">
+      <b>Перетащите запись звонка сюда</b>
+      <span class="muted">или нажмите, чтобы выбрать файл · mp3, m4a, wav, ogg, mp4, webm</span>
+      <input type="file" id="file" accept="audio/*,video/*" hidden>
+    </div>
+    <div class="status hidden" id="status"><span id="statusText"></span><div class="bar"><i id="barFill"></i></div></div>
+  </div>
+
+  <div class="card hidden" id="result">
+    <div class="tabs">
+      <button data-tab="report" class="on">Рекомендации</button>
+      <button data-tab="dialog">Диалог</button>
+    </div>
+    <div id="tab-report"></div>
+    <div id="tab-dialog" class="hidden"></div>
+    <div class="actions">
+      <button id="btnCopy">📋 Копировать всё</button>
+      <button id="btnDownload">⬇️ Скачать .txt</button>
+      <button id="btnSwap">🔄 Поменять роли местами</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="historyCard">
+    <h2>История</h2>
+    <div class="hist" id="history"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const API = 'https://api.groq.com/openai/v1';
+const MODELS = ['llama-3.3-70b-versatile','openai/gpt-oss-120b','llama-3.1-8b-instant'];
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v===null?d:JSON.parse(v); }catch{ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+};
+let current = null;
+
+/* ---------- settings ---------- */
+function loadSettings(){
+  const hk = location.hash.match(/key=(gsk_[\w-]+)/);
+  if(hk){ LS.set('key', hk[1]); history.replaceState(null,'',location.pathname+location.search); }
+  $('apiKey').value = LS.get('key','');
+  $('reportLang').value = LS.get('reportLang','ru');
+  $('model').value = LS.get('model','llama-3.3-70b-versatile');
+  $('context').value = LS.get('context','');
+  $('lang').value = LS.get('lang','');
+  if(!$('apiKey').value) $('settings').classList.remove('hidden');
+}
+$('btnSettings').onclick = () => $('settings').classList.toggle('hidden');
+$('btnSave').onclick = () => {
+  LS.set('key', $('apiKey').value.trim()); LS.set('reportLang', $('reportLang').value);
+  LS.set('model', $('model').value); LS.set('context', $('context').value.trim());
+  $('settings').classList.add('hidden');
+};
+$('lang').onchange = () => LS.set('lang', $('lang').value);
+
+/* ---------- ui helpers ---------- */
+function status(text, pct){
+  $('status').classList.remove('hidden'); $('statusText').textContent = text;
+  if(pct!=null) $('barFill').style.width = pct+'%';
+}
+const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = t => { t=Math.max(0,Math.round(t||0)); return Math.floor(t/60)+':'+String(t%60).padStart(2,'0'); };
+
+/* ---------- file input ---------- */
+const drop = $('drop');
+drop.onclick = () => $('file').click();
+$('file').onchange = e => e.target.files[0] && run(e.target.files[0]);
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => e.dataTransfer.files[0] && run(e.dataTransfer.files[0]));
+
+/* ---------- groq calls ---------- */
+async function groq(path, body, isForm){
+  const key = LS.get('key','');
+  if(!key){ $('settings').classList.remove('hidden'); throw new Error('Сначала вставьте ключ Groq в настройках.'); }
+  for(let attempt=0; attempt<6; attempt++){
+    const r = await fetch(API+path, {method:'POST',
+      headers: isForm ? {Authorization:'Bearer '+key} : {Authorization:'Bearer '+key,'Content-Type':'application/json'},
+      body: isForm ? body : JSON.stringify(body)});
+    if(r.status===429){
+      const err = await r.json().catch(()=>({}));
+      const msg = (err.error&&err.error.message)||'';
+      const m = msg.match(/try again in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)?s?/i);
+      const ra = parseFloat(r.headers.get('retry-after')) || (m ? (+m[1]||0)*3600+(+m[2]||0)*60+(+m[3]||0) : 15);
+      if((ra>90 || /per day/i.test(msg)) && !isForm){ // дневной лимит модели исчерпан: берём следующую бесплатную модель
+        const i = MODELS.indexOf(body.model);
+        if(i>-1 && i<MODELS.length-1){ body.model = MODELS[i+1]; status('Лимит модели на сегодня исчерпан, переключаюсь на '+body.model+'…'); continue; }
+      }
+      const wait = Math.min(60, ra);
+      status(`Бесплатный лимит Groq: жду ${Math.ceil(wait)} сек и продолжаю…`);
+      await new Promise(res => setTimeout(res, wait*1000)); continue;
+    }
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error((data.error&&data.error.message) || ('Ошибка Groq '+r.status));
+    return data;
+  }
+  throw new Error('Groq перегружен, попробуйте через минуту.');
+}
+
+async function chatJSON(system, user){
+  const pick = LS.get('model', MODELS[0]);
+  const d = await groq('/chat/completions', {
+    model: pick, temperature: 0.2,
+    response_format: {type:'json_object'},
+    messages: [{role:'system',content:system},{role:'user',content:user}]
+  });
+  return JSON.parse(d.choices[0].message.content);
+}
+
+/* ---------- audio: split big files into 16kHz mono WAV chunks ---------- */
+const MAX_BYTES = 24*1024*1024, CHUNK_SEC = 600;
+async function splitAudio(file){
+  if(file.size <= MAX_BYTES) return [{blob:file, name:file.name, offset:0}];
+  status('Файл большой, готовлю его по частям…', 3);
+  const buf = await file.arrayBuffer();
+  const ctx = new (window.AudioContext||window.webkitAudioContext)();
+  const decoded = await ctx.decodeAudioData(buf); ctx.close();
+  const rate = 16000, len = Math.ceil(decoded.duration*rate);
+  const off = new OfflineAudioContext(1, len, rate);
+  const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start();
+  const mono = (await off.startRendering()).getChannelData(0);
+  const parts = [], step = CHUNK_SEC*rate;
+  for(let i=0;i<mono.length;i+=step) parts.push({blob:wav(mono.subarray(i,i+step),rate), name:'part'+parts.length+'.wav', offset:i/rate});
+  return parts;
+}
+function wav(samples, rate){
+  const b = new ArrayBuffer(44+samples.length*2), v = new DataView(b);
+  const w = (o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  w(0,'RIFF');v.setUint32(4,36+samples.length*2,true);w(8,'WAVE');w(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,rate,true);
+  v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,samples.length*2,true);
+  for(let i=0;i<samples.length;i++){const s=Math.max(-1,Math.min(1,samples[i]));v.setInt16(44+i*2,s<0?s*0x8000:s*0x7fff,true);}
+  return new Blob([b],{type:'audio/wav'});
+}
+
+/* ---------- pipeline ---------- */
+async function transcribe(file){
+  const parts = await splitAudio(file);
+  const segs = []; let language = '';
+  for(let i=0;i<parts.length;i++){
+    status(`Расшифровываю аудио${parts.length>1?` (часть ${i+1} из ${parts.length})`:''}…`, 10+40*i/parts.length);
+    const fd = new FormData();
+    fd.append('file', parts[i].blob, parts[i].name);
+    fd.append('model','whisper-large-v3-turbo');
+    fd.append('response_format','verbose_json');
+    if($('lang').value) fd.append('language', $('lang').value);
+    const d = await groq('/audio/transcriptions', fd, true);
+    language = language || d.language || '';
+    (d.segments||[{start:0,text:d.text}]).forEach(s => { const t=(s.text||'').trim(); if(t) segs.push({start:s.start+parts[i].offset, text:t}); });
+  }
+  return {segs, language};
+}
+
+const ROLE_PROMPT = `Ты получаешь расшифровку телефонного звонка продаж, разбитую на пронумерованные фрагменты [номер|время]. Определи, кто говорит: "O" — оператор/продавец (звонит или отвечает от компании, представляется, презентует, задаёт квалифицирующие вопросы), "C" — клиент.
+Если во фрагменте говорят оба, раздели его на реплики. Исправь только очевидные ошибки распознавания, смысл не меняй, язык оригинала сохраняй.
+Верни JSON: {"turns":[{"r":"O"|"C","s":номер_фрагмента,"t":"текст реплики"}]}`;
+
+async function assignRoles(segs){
+  const lines = segs.map((s,i)=>`[${i}|${fmt(s.start)}] ${s.text}`);
+  const chunks = []; let cur = [];
+  lines.forEach(l => { if(cur.join('\n').length + l.length > 9000 && cur.length){ chunks.push(cur); cur=[]; } cur.push(l); });
+  if(cur.length) chunks.push(cur);
+  const turns = [];
+  for(let i=0;i<chunks.length;i++){
+    status(`Разделяю по ролям${chunks.length>1?` (${i+1}/${chunks.length})`:''}…`, 55+20*i/chunks.length);
+    const prev = turns.slice(-4).map(t=>`${t.r}: ${t.t}`).join('\n');
+    const ctx = $('context').value ? `Контекст: оператор продаёт — ${$('context').value}.\n` : '';
+    const res = await chatJSON(ROLE_PROMPT, ctx + (prev?`Последние реплики перед этим куском (для контекста, не включай их):\n${prev}\n\n`:'') + chunks[i].join('\n'));
+    (res.turns||[]).forEach(t => {
+      const seg = segs[t.s] || segs[0];
+      const r = t.r==='C'?'C':'O', last = turns[turns.length-1];
+      if(last && last.r===r) last.t += ' ' + t.t; else turns.push({r, t:t.t, start:seg?seg.start:0});
+    });
+  }
+  return turns;
+}
+
+function dialogText(turns, names){
+  return turns.map(t=>`[${fmt(t.start)}] ${t.r==='O'?names.O:names.C}: ${t.t}`).join('\n');
+}
+
+async function analyze(turns, language){
+  status('Анализирую разговор и готовлю рекомендации…', 82);
+  const rl = LS.get('reportLang','ru')==='es' ? 'испанском' : 'русском';
+  const ctx = $('context').value ? `Оператор продаёт: ${$('context').value}.\n` : '';
+  const sys = `Ты — опытный тренер по продажам и отработке возражений. Проанализируй звонок оператора с клиентом.
+Пиши пояснения на ${rl} языке. Готовые фразы для оператора ("better", "better_response", "script") пиши на языке самого звонка${language?` (${language})`:''}, чтобы их можно было сразу использовать.
+Будь конкретным: опирайся на цитаты из разговора, не выдумывай того, чего не было.
+Верни JSON:
+{"summary":"суть звонка в 2-3 предложениях",
+"outcome":"чем закончился звонок",
+"score":число 1-10,
+"stages":[{"name":"Приветствие и контакт|Выявление потребностей|Презентация|Работа с возражениями|Закрытие/следующий шаг","score":1-10,"comment":"коротко"}],
+"strengths":["что оператор сделал хорошо"],
+"mistakes":[{"quote":"цитата оператора","problem":"в чём ошибка","better":"как сказать лучше"}],
+"objections":[{"objection":"возражение клиента","operator_response":"как ответил оператор","verdict":"хорошо|частично|плохо","better_response":"сильный ответ по технике (присоединение, уточнение, аргумент, вопрос-закрытие)"}],
+"recommendations":["конкретные советы оператору на следующий звонок"],
+"script":"короткий улучшенный вариант ключевого момента звонка"}`;
+  return chatJSON(sys, ctx + dialogText(turns, {O:'Оператор', C:'Клиент'}));
+}
+
+async function run(file){
+  drop.style.pointerEvents='none';
+  try{
+    const t0 = Date.now();
+    const {segs, language} = await transcribe(file);
+    if(!segs.length) throw new Error('В записи не найдено речи.');
+    const turns = await assignRoles(segs);
+    let report = null;
+    try{ report = await analyze(turns, language); }catch(e){ report = {error:e.message}; }
+    current = {id:Date.now(), name:file.name, date:new Date().toLocaleString('ru-RU'), language, turns, report};
+    saveHistory(current); render(current);
+    status(`Готово за ${Math.round((Date.now()-t0)/1000)} сек.`, 100);
+  }catch(e){ status('⚠️ '+e.message, 0); }
+  finally{ drop.style.pointerEvents=''; $('file').value=''; }
+}
+
+/* ---------- render ---------- */
+function render(c){
+  $('result').classList.remove('hidden');
+  $('tab-dialog').innerHTML = `<p class="muted">${esc(c.name)} · ${esc(c.date)}${c.language?' · '+esc(c.language):''}</p>` +
+    c.turns.map(t=>`<div class="turn ${t.r==='O'?'op':'cl'}"><div class="who">${t.r==='O'?'Оператор':'Клиент'}<small>${fmt(t.start)}</small></div><div class="msg">${esc(t.t)}</div></div>`).join('');
+  const r = c.report||{};
+  if(r.error){ $('tab-report').innerHTML = `<p class="bad">Анализ не удался: ${esc(r.error)}</p><button onclick="reanalyze()">Повторить анализ</button>`; return; }
+  const list = a => (a&&a.length)?'<ul>'+a.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':'<p class="muted">—</p>';
+  const vcol = v => /хорош|bien|good/i.test(v)?'good':(/плох|mal|bad/i.test(v)?'bad':'');
+  $('tab-report').innerHTML = `
+    <div class="row" style="align-items:center">
+      <div style="flex:0 0 auto"><div class="score">${esc(r.score??'—')}<span class="muted" style="font-size:16px">/10</span></div></div>
+      <div><b>Итог:</b> ${esc(r.outcome)}<br><span class="muted">${esc(r.summary)}</span></div>
+    </div>
+    ${(r.stages||[]).length?'<h3>Этапы продажи</h3>'+r.stages.map(s=>`<div class="item"><span class="pill">${esc(s.score)}/10</span> <b>${esc(s.name)}</b> — ${esc(s.comment)}</div>`).join(''):''}
+    <h3>✅ Что получилось</h3>${list(r.strengths)}
+    <h3>❌ Ошибки оператора</h3>${(r.mistakes||[]).map(m=>`<div class="item"><div class="q">«${esc(m.quote)}»</div><div class="bad">${esc(m.problem)}</div><div class="good">Лучше: ${esc(m.better)}</div></div>`).join('')||'<p class="muted">Явных ошибок нет</p>'}
+    <h3>🛡️ Возражения клиента</h3>${(r.objections||[]).map(o=>`<div class="item"><b>${esc(o.objection)}</b> <span class="pill">${esc(o.verdict)}</span><div class="q">Оператор: ${esc(o.operator_response)}</div><div class="good">Сильный ответ: ${esc(o.better_response)}</div></div>`).join('')||'<p class="muted">Возражений не было</p>'}
+    <h3>💡 Рекомендации</h3>${list(r.recommendations)}
+    ${r.script?`<h3>📝 Улучшенный скрипт</h3><div class="item" style="white-space:pre-wrap">${esc(r.script)}</div>`:''}`;
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on', x===b));
+  $('tab-report').classList.toggle('hidden', b.dataset.tab!=='report');
+  $('tab-dialog').classList.toggle('hidden', b.dataset.tab!=='dialog');
+});
+
+async function reanalyze(){
+  if(!current) return;
+  try{ current.report = await analyze(current.turns, current.language); status('Готово.',100); }
+  catch(e){ current.report = {error:e.message}; }
+  saveHistory(current); render(current);
+}
+$('btnSwap').onclick = async () => {
+  if(!current) return;
+  current.turns.forEach(t => t.r = t.r==='O'?'C':'O');
+  render(current); await reanalyze();
+};
+
+function plainText(c){
+  const r = c.report||{}, L = [];
+  L.push(`РАЗБОР ЗВОНКА: ${c.name} (${c.date})`, '');
+  if(!r.error){
+    L.push(`Оценка: ${r.score}/10`, `Итог: ${r.outcome}`, r.summary||'', '');
+    (r.stages||[]).forEach(s=>L.push(`- ${s.name}: ${s.score}/10 — ${s.comment}`));
+    L.push('', 'ЧТО ПОЛУЧИЛОСЬ:', ...(r.strengths||[]).map(x=>'- '+x));
+    L.push('', 'ОШИБКИ:', ...(r.mistakes||[]).map(m=>`- «${m.quote}» — ${m.problem}\n  Лучше: ${m.better}`));
+    L.push('', 'ВОЗРАЖЕНИЯ:', ...(r.objections||[]).map(o=>`- ${o.objection} [${o.verdict}]\n  Оператор: ${o.operator_response}\n  Сильный ответ: ${o.better_response}`));
+    L.push('', 'РЕКОМЕНДАЦИИ:', ...(r.recommendations||[]).map(x=>'- '+x));
+    if(r.script) L.push('', 'СКРИПТ:', r.script);
+  }
+  L.push('', 'ДИАЛОГ:', dialogText(c.turns, {O:'Оператор', C:'Клиент'}));
+  return L.join('\n');
+}
+$('btnCopy').onclick = () => current && navigator.clipboard.writeText(plainText(current)).then(()=>status('Скопировано.',100));
+$('btnDownload').onclick = () => {
+  if(!current) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([plainText(current)],{type:'text/plain;charset=utf-8'}));
+  a.download = current.name.replace(/\.[^.]+$/,'')+'_разбор.txt'; a.click();
+};
+
+/* ---------- history ---------- */
+function saveHistory(c){
+  const h = LS.get('history',[]).filter(x=>x.id!==c.id);
+  h.unshift(c); LS.set('history', h.slice(0,30)); renderHistory();
+}
+function renderHistory(){
+  const h = LS.get('history',[]);
+  $('historyCard').classList.toggle('hidden', !h.length);
+  $('history').innerHTML = h.map(x=>`<a data-id="${x.id}"><span>${esc(x.name)}</span><span class="muted">${esc(x.report&&x.report.score!=null?x.report.score+'/10 · ':'')}${esc(x.date)}</span></a>`).join('');
+  $('history').querySelectorAll('a').forEach(a => a.onclick = () => {
+    current = LS.get('history',[]).find(x=>String(x.id)===a.dataset.id); render(current); window.scrollTo({top:0,behavior:'smooth'});
+  });
+}
+
+loadSettings(); renderHistory();
+</script>
+</body>
+</html>
