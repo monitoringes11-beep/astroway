@@ -53,6 +53,9 @@ label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
 ul{margin:6px 0;padding-left:20px}
 .hist a{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none;cursor:pointer}
 .hidden{display:none}
+details.op{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:8px 0}
+details.op summary{cursor:pointer;font-weight:600;display:flex;justify-content:space-between;gap:8px;align-items:center}
+details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 @media (max-width:560px){.turn{flex-direction:column;gap:2px}.who{flex:none}}
 </style>
@@ -60,7 +63,7 @@ ul{margin:6px 0;padding-left:20px}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v4</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v5</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -91,6 +94,9 @@ ul{margin:6px 0;padding-left:20px}
     <div class="row" style="margin-bottom:12px">
       <div><label>Язык звонка</label>
         <select id="lang"><option value="">Определить автоматически</option><option value="es">Испанский</option><option value="ru">Русский</option><option value="en">Английский</option></select></div>
+      <div><label>Оператор (звонки сохраняются в его папку)</label>
+        <div style="display:flex;gap:8px"><input id="operator" list="opList" placeholder="Имя оператора, напр. María"><button id="btnNewOp" title="Начать нового оператора" style="white-space:nowrap">➕ Новый</button></div>
+        <datalist id="opList"></datalist></div>
     </div>
     <div class="drop" id="drop">
       <b>Перетащите сюда запись звонка или сразу несколько</b>
@@ -118,8 +124,14 @@ ul{margin:6px 0;padding-left:20px}
   </div>
 
   <div class="card hidden" id="historyCard">
-    <h2>История</h2>
+    <h2 id="historyTitle">Звонки оператора</h2>
     <div class="hist" id="history"></div>
+  </div>
+
+  <div class="card hidden" id="archiveCard">
+    <h2>🗂️ Архив операторов</h2>
+    <p class="muted" style="margin-top:-6px">Звонки других операторов. Нажмите на папку, чтобы раскрыть, или «Открыть оператора», чтобы снова работать с ним.</p>
+    <div id="archive"></div>
   </div>
 </div>
 
@@ -151,6 +163,10 @@ $('btnSave').onclick = () => {
   $('settings').classList.add('hidden');
 };
 $('lang').onchange = () => LS.set('lang', $('lang').value);
+const opName = () => ($('operator').value||'').trim() || 'Без имени';
+$('operator').value = LS.get('operator','');
+$('operator').onchange = () => { LS.set('operator', $('operator').value.trim()); renderHistory(); };
+$('btnNewOp').onclick = () => { $('operator').value=''; LS.set('operator',''); $('result').classList.add('hidden'); renderHistory(); $('operator').focus(); };
 
 /* ---------- ui helpers ---------- */
 function status(text, pct){
@@ -340,7 +356,7 @@ async function run(file, prefix, many){
     let report = null;
     const lang = LS.get('reportLang','ru');
     try{ report = await analyze(turns, language, lang); }catch(e){ report = {error:e.message}; }
-    current = {id:Date.now(), name:file.name, date:new Date().toLocaleString('ru-RU'), language, turns, report, lang, reports:{[lang]:report}};
+    current = {id:Date.now(), operator:opName(), name:file.name, date:new Date().toLocaleString('ru-RU'), language, turns, report, lang, reports:{[lang]:report}};
     saveHistory(current); if(!many) render(current);
     status(`Готово за ${Math.round((Date.now()-t0)/1000)} сек.`, 100);
     return current;
@@ -357,7 +373,7 @@ async function runMany(files){
   const lang = LS.get('reportLang','ru');
   const calls = ok.map(x=>({id:x.id, name:x.name, score:x.report.score, report:x.report}));
   let report; try{ report = await summarize(calls, lang); }catch(e){ report = {error:e.message}; }
-  current = {id:Date.now(), multi:true, name:`Сводный разбор · ${ok.length} звонков`, date:new Date().toLocaleString('ru-RU'), calls, report, lang, reports:{[lang]:report}, turns:[]};
+  current = {id:Date.now(), operator:opName(), multi:true, name:`Сводный разбор · ${ok.length} звонков`, date:new Date().toLocaleString('ru-RU'), calls, report, lang, reports:{[lang]:report}, turns:[]};
   saveHistory(current); render(current);
   const failed = items.length-ok.length;
   status(`Готово за ${Math.round((Date.now()-t0)/1000)} сек.${failed?` Не удалось разобрать: ${failed}.`:''}`, 100);
@@ -488,15 +504,32 @@ $('btnDownload').onclick = () => {
 
 /* ---------- history ---------- */
 function saveHistory(c){
-  const h = LS.get('history',[]).filter(x=>x.id!==c.id);
-  h.unshift(c); LS.set('history', h.slice(0,30)); renderHistory();
+  let h = LS.get('history',[]).filter(x=>x.id!==c.id);
+  h.unshift(c); h = h.slice(0,300);
+  // если память браузера переполнена, убираем самые старые разборы
+  while(h.length){ try{ localStorage.setItem('history', JSON.stringify(h)); break; }catch{ h.pop(); } }
+  renderHistory();
+}
+function histRow(x){
+  return `<a data-id="${x.id}"><span>${x.multi?'📊 ':''}${esc(x.name)}</span><span class="muted">${esc(x.report&&x.report.score!=null?x.report.score+'/10 · ':'')}${esc(x.date)}</span></a>`;
 }
 function renderHistory(){
-  const h = LS.get('history',[]);
-  $('historyCard').classList.toggle('hidden', !h.length);
-  $('history').innerHTML = h.map(x=>`<a data-id="${x.id}"><span>${esc(x.name)}</span><span class="muted">${esc(x.report&&x.report.score!=null?x.report.score+'/10 · ':'')}${esc(x.date)}</span></a>`).join('');
-  $('history').querySelectorAll('a').forEach(a => a.onclick = () => {
+  const h = LS.get('history',[]), me = opName();
+  const groups = {};
+  h.forEach(x => { const o = x.operator||'Без имени'; (groups[o] = groups[o]||[]).push(x); });
+  $('opList').innerHTML = Object.keys(groups).map(o=>`<option value="${esc(o)}">`).join('');
+  const mine = groups[me]||[];
+  $('historyTitle').textContent = `Звонки оператора: ${me}`;
+  $('historyCard').classList.toggle('hidden', !mine.length);
+  $('history').innerHTML = mine.map(histRow).join('');
+  const others = Object.keys(groups).filter(o=>o!==me);
+  $('archiveCard').classList.toggle('hidden', !others.length);
+  $('archive').innerHTML = others.map(o=>`<details class="op"><summary><span>📁 ${esc(o)} <span class="muted">(${groups[o].length})</span></span><button data-op="${esc(o)}">Открыть оператора</button></summary><div class="hist">${groups[o].map(histRow).join('')}</div></details>`).join('');
+  document.querySelectorAll('#history a, #archive a').forEach(a => a.onclick = () => {
     current = LS.get('history',[]).find(x=>String(x.id)===a.dataset.id); render(current); window.scrollTo({top:0,behavior:'smooth'});
+  });
+  $('archive').querySelectorAll('[data-op]').forEach(bt => bt.onclick = e => {
+    e.preventDefault(); $('operator').value = bt.dataset.op; LS.set('operator', bt.dataset.op); $('result').classList.add('hidden'); renderHistory(); window.scrollTo({top:0,behavior:'smooth'});
   });
 }
 
