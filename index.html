@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v23</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v24</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -93,7 +93,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
     <div style="margin-top:10px"><label>Правила компании (ИИ проверяет звонки по ним и не советует того, что запрещено)</label>
       <textarea id="rules" rows="9" style="font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%"></textarea></div>
     <div style="margin-top:12px;padding:10px;border:1px dashed var(--line);border-radius:10px">
-      <label>📦 Скрипты продуктов (таблица «Guion de productos Naturonica», файл .xlsx). Хранятся только в этом браузере.</label>
+      <label>📦 Скрипты продуктов второй линии — База и Физика (таблица «Guion de productos Naturonica», файл .xlsx). Хранятся только в этом браузере.</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
         <input type="file" id="prodFile" accept=".xlsx,.xls" style="max-width:320px">
         <button id="btnProdDel">Удалить скрипты</button>
@@ -265,7 +265,7 @@ function detectProducts(turns){
 }
 function productBlock(names){
   const p = LS.get('products', null); if(!p || !names.length) return '';
-  return `\nСКРИПТЫ ПРОДУКТОВ (из таблицы «Guion de productos Naturonica»). В звонке обсуждается: ${names.join(', ')}. Сверяй с этим скриптом презентацию продукта, вопросы на выявление потребностей, способ приёма, запреты из раздела «NO DIGA» и цены (столбец Base — вторая линия, Telemarketing — первая линия ОЛ). Если оператор хотя бы частично говорил по скрипту продукта или дал из него хоть какую-то верную информацию — это ПЛЮС: обязательно отметь это в "used" и в "strengths" и учитывай в оценке. Всё, что оператор сказал не так, как в скрипте, или что запрещено в «NO DIGA», — отметь с цитатой и правильным вариантом из скрипта.\n` + names.map(n => `=== ${n} ===\n${p.items[n]}`).join('\n\n') + '\n';
+  return `\nСКРИПТЫ ПРОДУКТОВ (из таблицы «Guion de productos Naturonica»). В звонке обсуждается: ${names.join(', ')}. Сверяй с этим скриптом презентацию продукта, вопросы на выявление потребностей, способ приёма, запреты из раздела «NO DIGA» и цены по столбцу Base (это скрипт второй линии: База и Физика). Если оператор хотя бы частично говорил по скрипту продукта или дал из него хоть какую-то верную информацию — это ПЛЮС: обязательно отметь это в "used" и в "strengths" и учитывай в оценке. Всё, что оператор сказал не так, как в скрипте, или что запрещено в «NO DIGA», — отметь с цитатой и правильным вариантом из скрипта.\n` + names.map(n => `=== ${n} ===\n${p.items[n]}`).join('\n\n') + '\n';
 }
 $('prodFile').onchange = e => e.target.files[0] && importProducts(e.target.files[0]);
 $('btnProdDel').onclick = () => { if(confirm('Удалить загруженные скрипты продуктов из этого браузера?')){ localStorage.removeItem('products'); prodInfo(); } };
@@ -523,7 +523,7 @@ ${L.regs?`"crm_status":"какой статус по регламенту нуж
 "script":"короткий улучшенный вариант ключевого момента звонка"}`;
   const resTxt = result==='ok' ? 'Оператор поставил этому звонку статус ПОДТВЕРЖДЕНИЕ (заказ подтверждён). Проверь, правильно ли это по правилам.\n' : result==='no' ? 'Оператор поставил этому звонку статус ОТКАЗ. Проверь, правильно ли это по правилам (не должен ли быть Дубль, Перезвон и т.п.) и не слил ли оператор заказ.\n' : '';
   const dlg = dialogText(turns, {O:'Оператор', C:'Клиент'});
-  const prods = detectProducts(turns);
+  const prods = (line==='base' || line==='fiz') ? detectProducts(turns) : []; // эти скрипты только для второй линии (База и Физика)
   const sysP = prods.length ? sys.replace('\nВерни JSON:', productBlock(prods) + '\nВерни JSON:').replace('"stages":[', '"product_check":{"product":"какой продукт обсуждали","presentation":"насколько презентация соответствует скрипту продукта (коротко)","used":["что из скрипта продукта оператор сказал (это плюс оператору)"],"missed":["что важное из скрипта продукта оператор пропустил"],"wrong":["что сказано неверно или запрещено в «NO DIGA»: цитата → как правильно по скрипту"]},\n"stages":[') : sys;
   const rep = await chatJSON(sysP, ctx + resTxt + 'Разбери ВЕСЬ разговор от начала до конца, включая его конец.\n' + dlg);
   // если модель что-то пропустила (бывает на длинных звонках) — дозапрашиваем недостающие блоки
