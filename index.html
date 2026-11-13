@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v10</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v11</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -100,6 +100,8 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
     <div class="row" style="margin-bottom:12px">
       <div><label>Язык звонка</label>
         <select id="lang"><option value="">Определить автоматически</option><option value="es">Испанский</option><option value="ru">Русский</option><option value="en">Английский</option></select></div>
+      <div><label>Линия / группа</label>
+        <select id="line"><option value="ol">Общая линия (ОЛ, первая)</option><option value="base">Вторая линия — «База»</option><option value="fiz">Вторая линия — «Физика»</option></select></div>
       <div><label>Оператор (звонки сохраняются в его папку)</label>
         <div style="display:flex;gap:8px"><input id="operator" list="opList" placeholder="Имя оператора, напр. María"><button id="btnNewOp" title="Начать нового оператора" style="white-space:nowrap">➕ Новый</button></div>
         <datalist id="opList"></datalist></div>
@@ -183,6 +185,7 @@ $('btnSave').onclick = () => {
   $('settings').classList.add('hidden');
 };
 $('lang').onchange = () => LS.set('lang', $('lang').value);
+$('line').value = LS.get('line','ol'); $('line').onchange = () => LS.set('line', $('line').value);
 const opName = () => ($('operator').value||'').trim() || 'Без имени';
 $('operator').value = LS.get('operator','');
 $('operator').onchange = () => { LS.set('operator', $('operator').value.trim()); renderHistory(); };
@@ -343,25 +346,44 @@ function rulesBlock(){
   const r = (LS.get('rules', DEFAULT_RULES)||'').trim();
   return r ? `\nПРАВИЛА КОМПАНИИ (обязательны). Нарушение правила оператором — это ошибка: укажи её в mistakes со ссылкой на правило. Все советы, «better», «best_response», «phrase» и «script» должны строго соблюдать эти правила (никогда не предлагай то, что они запрещают):\n${r}\n` : '';
 }
+const LINES = {
+  ol:{name:'Общая линия (ОЛ, первая линия)', short:'ОЛ',
+    ru:'Приветствие|Выявление потребностей|Фраза-мост к презентации|Презентация продукта|Фраза-мост к цене|Цена: два курса, начиная с дорогого|Фраза-мост к возражениям|Работа с возражениями|Результат (продажа или отказ)',
+    es:'Saludo|Detección de necesidades|Frase puente a la presentación|Presentación del producto|Frase puente al precio|Precio: dos cursos, empezando por el más caro|Frase puente a las objeciones|Manejo de objeciones|Resultado (venta o rechazo)',
+    rules:`Звонок общей линии (ОЛ, первая линия). Этапы продаж строго в таком порядке: 1) приветствие; 2) выявление потребностей; 3) фраза-«мост» к следующему этапу; 4) презентация продукта; 5) фраза-«мост»; 6) произнесение цены, начиная с высокой, демонстрируя ДВА курса, чтобы клиент выбрал один из них; 7) фраза-«мост»; 8) работа с возражениями; 9) результат — продажа или отказ. Проверь наличие каждой фразы-«моста» между этапами; пропущенный мост или этап — ошибка. Цена показывается двумя курсами на выбор.`},
+  base:{name:'Вторая линия, группа «База»', short:'База',
+    ru:'Приветствие|Работа с возражениями (если есть)|Выявление потребностей и самочувствия|Презентация: результаты и на что влияет продукт|Цена: от высокого курса вниз',
+    es:'Saludo|Manejo de objeciones (si las hay)|Detección de necesidades y cómo se siente|Presentación: resultados y en qué influye el producto|Precio: del curso más alto hacia abajo',
+    rules:`Звонок второй линии, группа «База». Этапы продаж строго в таком порядке: 1) приветствие; 2) работа с возражениями, если они есть; 3) выявление потребностей — уточнить, как клиент себя чувствует; 4) небольшая презентация продукта: какие результаты получит клиент и на что продукт влияет; 5) подача цены — начинать с более высокого курса и, отрабатывая возражения, постепенно спускаться. Норма группы «База»: средний чек дня 125 €, минимальная продажа 105 € — продажа ниже 105 € является ошибкой, продажа ниже 125 € — повод проверить, не спустился ли оператор слишком быстро.`},
+  fiz:{name:'Вторая линия, группа «Физика»', short:'Физика',
+    ru:'Приветствие|Работа с возражениями (если есть)|Выявление потребностей и самочувствия|Презентация: результаты и на что влияет продукт|Цена: от высокого курса вниз',
+    es:'Saludo|Manejo de objeciones (si las hay)|Detección de necesidades y cómo se siente|Presentación: resultados y en qué influye el producto|Precio: del curso más alto hacia abajo',
+    rules:`Звонок второй линии, группа «Физика». Этапы продаж строго в таком порядке: 1) приветствие; 2) работа с возражениями, если они есть; 3) выявление потребностей — уточнить, как клиент себя чувствует; 4) небольшая презентация продукта: какие результаты получит клиент и на что продукт влияет; 5) подача цены — начинать с более высокого курса и, отрабатывая возражения, постепенно спускаться. Норма группы «Физика»: средний чек дня 110 €, минимальная продажа 95 € — продажа ниже 95 € является ошибкой, продажа ниже 110 € — повод проверить, не спустился ли оператор слишком быстро.`}
+};
+const lineOf = c => (c && c.line) || $('line').value || 'ol';
 const T = {
   ru:{O:'Оператор',C:'Клиент',title:'РАЗБОР ЗВОНКА',score:'Оценка',outcome:'Итог',stages:'Этапы продажи',strengths:'Что получилось',mistakes:'Ошибки оператора',noMistakes:'Явных ошибок нет',better:'Лучше',objections:'Возражения клиента',noObj:'Возражений не было',op:'Оператор',strong:'Сильный ответ',recs:'Рекомендации',script:'Улучшенный скрипт',dialog:'ДИАЛОГ',lang:'русском',resume:'Резюме звонка',resumes:'Резюме по каждому звонку',overall:'Общее резюме по всем звонкам',sum:'Сводный разбор оператора',calls:'звонков',avg:'Средняя оценка',rec:'Повторяющиеся ошибки',where:'Где',fix:'Как исправить',phrase:'Фраза',objs:'Типичные возражения',often:'Как часто',prio:'Главные приоритеты',plan:'План тренировки',perCall:'Оценки по звонкам',
       stageNames:'Приветствие и контакт|Выявление потребностей|Презентация|Работа с возражениями|Закрытие/следующий шаг',verdicts:'хорошо|частично|плохо'},
   es:{O:'Operador',C:'Cliente',title:'ANÁLISIS DE LA LLAMADA',score:'Puntuación',outcome:'Resultado',stages:'Etapas de la venta',strengths:'Lo que hiciste bien',mistakes:'Errores del operador',noMistakes:'Sin errores evidentes',better:'Mejor así',objections:'Objeciones del cliente',noObj:'No hubo objeciones',op:'Operador',strong:'Respuesta recomendada',recs:'Recomendaciones',script:'Guion mejorado',dialog:'DIÁLOGO',lang:'español',resume:'Resumen de la llamada',resumes:'Resumen de cada llamada',overall:'Resumen general de todas las llamadas',sum:'Análisis global del operador',calls:'llamadas',avg:'Puntuación media',rec:'Errores que se repiten',where:'Dónde',fix:'Cómo corregirlo',phrase:'Frase',objs:'Objeciones típicas',often:'Frecuencia',prio:'Prioridades principales',plan:'Plan de entrenamiento',perCall:'Puntuación por llamada',
       stageNames:'Saludo y contacto|Detección de necesidades|Presentación|Manejo de objeciones|Cierre / siguiente paso',verdicts:'bien|parcial|mal'}
 };
-async function analyze(turns, language, lang){
-  lang = lang || LS.get('reportLang','ru'); const t = T[lang];
+async function analyze(turns, language, lang, line){
+  lang = lang || LS.get('reportLang','ru'); const t = T[lang]; const L = LINES[line||'ol'];
   status(lang==='es'?'Готовлю отчёт на испанском…':'Анализирую разговор и готовлю рекомендации…', 82);
   const ctx = $('context').value ? `Оператор продаёт: ${$('context').value}.\n` : '';
   const sys = `Ты — опытный тренер по продажам и отработке возражений. Проанализируй звонок оператора с клиентом.
 ВЕСЬ отчёт пиши строго на языке: ${t.lang} — все пояснения, названия этапов, оценки, советы. Готовые фразы для оператора ("better", "better_response", "script") пиши на языке самого звонка${language?` (${language})`:''}, чтобы их можно было сразу использовать.
 Будь конкретным: опирайся на цитаты из разговора, не выдумывай того, чего не было.
-${rulesBlock()}${lang==='es'?' Обращайся к оператору на «tú», доброжелательно, как тренер.':''}
+${rulesBlock()}
+ЛИНИЯ И ЭТАПЫ ПРОДАЖ: ${L.rules}
+Оценивай звонок именно по этим этапам: в "stages" перечисли ВСЕ этапы этой линии в указанном порядке (даже если этап пропущен — тогда низкая оценка и пометка «пропущен»).${lang==='es'?' Обращайся к оператору на «tú», доброжелательно, как тренер.':''}
 Верни JSON:
 {"summary":"резюме звонка в 3-4 предложениях: кто клиент и что ему нужно, что предложил оператор, как реагировал клиент, чем закончилось",
 "outcome":"чем закончился звонок",
 "score":число 1-10,
-"stages":[{"name":"${t.stageNames}","score":1-10,"comment":"коротко"}],
+"sale":"что и за сколько продано (курс, число упаковок, сумма в €) или «нет продажи»",
+"check_note":"сравнение суммы с нормой группы (средний и минимальный чек), если применимо; иначе пусто",
+"stages":[{"name":"${L[lang]}","score":1-10,"comment":"коротко"}],
 "strengths":["что оператор сделал хорошо"],
 "mistakes":[{"quote":"цитата оператора","problem":"в чём ошибка","better":"как сказать лучше"}],
 "objections":[{"objection":"возражение клиента","operator_response":"как ответил оператор","verdict":"${t.verdicts}","better_response":"сильный ответ по технике (присоединение, уточнение, аргумент, вопрос-закрытие)"}],
@@ -380,8 +402,9 @@ async function run(file, prefix, many){
     const turns = await assignRoles(segs);
     let report = null;
     const lang = LS.get('reportLang','ru');
-    try{ report = await analyze(turns, language, lang); }catch(e){ report = {error:e.message}; }
-    current = {id:Date.now(), operator:opName(), name:file.name, date:new Date().toLocaleString('ru-RU'), language, turns, report, lang, reports:{[lang]:report}};
+    const line = $('line').value;
+    try{ report = await analyze(turns, language, lang, line); }catch(e){ report = {error:e.message}; }
+    current = {id:Date.now(), operator:opName(), line, name:file.name, date:new Date().toLocaleString('ru-RU'), language, turns, report, lang, reports:{[lang]:report}};
     saveHistory(current); if(!many) render(current);
     status(`Готово за ${Math.round((Date.now()-t0)/1000)} сек.`, 100);
     return current;
@@ -397,18 +420,20 @@ async function runMany(files){
   if(!ok.length){ status('⚠️ Ни один звонок не удалось разобрать.',0); return; }
   const lang = LS.get('reportLang','ru');
   const calls = ok.map(x=>({id:x.id, name:x.name, score:x.report.score, report:x.report}));
-  let report; try{ report = await summarize(calls, lang); }catch(e){ report = {error:e.message}; }
-  current = {id:Date.now(), operator:opName(), multi:true, name:`Сводный разбор · ${ok.length} звонков`, date:new Date().toLocaleString('ru-RU'), calls, report, lang, reports:{[lang]:report}, turns:[]};
+  const line = $('line').value; let report; try{ report = await summarize(calls, lang, line); }catch(e){ report = {error:e.message}; }
+  current = {id:Date.now(), operator:opName(), line, multi:true, name:`Сводный разбор · ${ok.length} звонков`, date:new Date().toLocaleString('ru-RU'), calls, report, lang, reports:{[lang]:report}, turns:[]};
   saveHistory(current); render(current);
   const failed = items.length-ok.length;
   status(`Готово за ${Math.round((Date.now()-t0)/1000)} сек.${failed?` Не удалось разобрать: ${failed}.`:''}`, 100);
 }
 
-async function summarize(calls, lang){
-  const t = T[lang||'ru'];
+async function summarize(calls, lang, line){
+  const t = T[lang||'ru']; const L = LINES[line||'ol'];
   status(lang==='es'?'Готовлю сводный отчёт на испанском…':'Готовлю сводный разбор по всем звонкам…', 92);
-  const brief = calls.map((c,i)=>({call:i+1, name:c.name, score:c.report.score, outcome:c.report.outcome, stages:c.report.stages, strengths:c.report.strengths, mistakes:c.report.mistakes, objections:c.report.objections, recommendations:c.report.recommendations}));
+  const brief = calls.map((c,i)=>({call:i+1, name:c.name, score:c.report.score, outcome:c.report.outcome, sale:c.report.sale, stages:c.report.stages, strengths:c.report.strengths, mistakes:c.report.mistakes, objections:c.report.objections, recommendations:c.report.recommendations}));
   const sys = `Ты — опытный тренер по продажам. Ниже разборы нескольких звонков ОДНОГО оператора. Сделай сводный разбор: найди закономерности, повторяющиеся ошибки и сильные стороны, а не пересказывай каждый звонок.
+ЛИНИЯ И ЭТАПЫ ПРОДАЖ: ${L.rules}
+Отдельно оцени, на каких этапах оператор стабильно проседает, и как его продажи соотносятся с нормой чека группы.
 ${rulesBlock()}
 ВЕСЬ отчёт пиши строго на языке: ${t.lang}. Готовые фразы для оператора ("phrase", "best_response") — на языке звонков.${lang==='es'?' Обращайся к оператору на «tú», доброжелательно.':''}
 Верни JSON:
@@ -416,6 +441,8 @@ ${rulesBlock()}
 "strengths":["устойчивые сильные стороны"],
 "recurring_mistakes":[{"mistake":"ошибка","where":"в каких звонках (номера)","fix":"как исправить","phrase":"готовая фраза"}],
 "objections":[{"objection":"возражение","how_often":"сколько раз встречалось","best_response":"лучший ответ"}],
+"weak_stages":["этапы, на которых оператор проседает чаще всего, с пояснением"],
+"check_summary":"продажи оператора относительно нормы чека группы (если применимо)",
 "priorities":["3 главных приоритета на неделю"],
 "training_plan":["конкретные упражнения для тренировки"],
 "per_call":[{"call":номер,"score":1-10,"summary":"резюме звонка в 2-3 предложениях: суть разговора и чем закончился","one_line":"главный вывод для оператора по этому звонку"}]}`;
@@ -438,7 +465,7 @@ function render(c){
   $('tab-report').innerHTML = `
     <div class="row" style="align-items:center">
       <div style="flex:0 0 auto"><div class="score">${esc(r.score??'—')}<span class="muted" style="font-size:16px">/10</span></div></div>
-      <div><b>${t.outcome}:</b> ${esc(r.outcome)}</div>
+      <div><span class="pill">${esc(LINES[lineOf(c)].short)}</span> <b>${t.outcome}:</b> ${esc(r.outcome)}${r.sale?`<br><b>💶 ${lang==='es'?'Venta':'Продажа'}:</b> ${esc(r.sale)}`:''}${r.check_note?`<br><span class="muted">${esc(r.check_note)}</span>`:''}</div>
     </div>
     <h3>📄 ${t.resume}</h3><div class="item">${esc(r.summary)}</div>
     ${(r.stages||[]).length?`<h3>${t.stages}</h3>`+r.stages.map(x=>`<div class="item"><span class="pill">${esc(x.score)}/10</span> <b>${esc(x.name)}</b> — ${esc(x.comment)}</div>`).join(''):''}
@@ -456,7 +483,7 @@ function renderSummary(c){
   if(r.error){ $('tab-report').innerHTML = `<p class="bad">Сводный анализ не удался: ${esc(r.error)}</p><button onclick="reanalyze()">Повторить</button>`; return; }
   const list = a => (a&&a.length)?'<ul>'+a.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':'<p class="muted">—</p>';
   $('tab-report').innerHTML = `
-    <h2>${t.sum} · ${c.calls.length} ${t.calls}</h2>
+    <h2>${t.sum} · ${c.calls.length} ${t.calls} <span class="pill">${esc(LINES[lineOf(c)].short)}</span></h2>
     <div class="row" style="align-items:center">
       <div style="flex:0 0 auto"><div class="score">${avg}<span class="muted" style="font-size:16px">/10</span></div></div>
       <div class="muted">${t.avg}</div>
@@ -466,6 +493,8 @@ function renderSummary(c){
     <h3>✅ ${t.strengths}</h3>${list(r.strengths)}
     <h3>❌ ${t.rec}</h3>${(r.recurring_mistakes||[]).map(m=>`<div class="item"><b class="bad">${esc(m.mistake)}</b> <span class="pill">${t.where}: ${esc(m.where)}</span><div>${t.fix}: ${esc(m.fix)}</div><div class="good">${t.phrase}: ${esc(m.phrase)}</div></div>`).join('')||`<p class="muted">${t.noMistakes}</p>`}
     <h3>🛡️ ${t.objs}</h3>${(r.objections||[]).map(o=>`<div class="item"><b>${esc(o.objection)}</b> <span class="pill">${t.often}: ${esc(o.how_often)}</span><div class="good">${t.strong}: ${esc(o.best_response)}</div></div>`).join('')||`<p class="muted">${t.noObj}</p>`}
+    ${(r.weak_stages||[]).length?`<h3>📉 ${c.lang==='es'?'Etapas más débiles':'Слабые этапы'}</h3>${list(r.weak_stages)}`:''}
+    ${r.check_summary?`<h3>💶 ${c.lang==='es'?'Ticket medio vs. norma':'Чек относительно нормы'}</h3><div class="item">${esc(r.check_summary)}</div>`:''}
     <h3>🎯 ${t.prio}</h3>${list(r.priorities)}
     <h3>🏋️ ${t.plan}</h3>${list(r.training_plan)}`;
 }
@@ -485,7 +514,7 @@ document.querySelectorAll('.tabs button[data-tab]').forEach(b => b.onclick = () 
 async function reanalyze(){
   if(!current) return;
   const lang = current.lang||'ru'; current.reports = current.reports||{};
-  try{ current.report = current.multi ? await summarize(current.calls, lang) : await analyze(current.turns, current.language, lang); status('Готово.',100); }
+  try{ current.report = current.multi ? await summarize(current.calls, lang, lineOf(current)) : await analyze(current.turns, current.language, lang, lineOf(current)); status('Готово.',100); }
   catch(e){ current.report = {error:e.message}; }
   current.reports[lang] = current.report;
   saveHistory(current); render(current);
@@ -504,6 +533,8 @@ function plainText(c){
     L.push('', '✅ '+t.strengths.toUpperCase()+':', ...(r.strengths||[]).map(x=>'- '+x));
     L.push('', '❌ '+t.rec.toUpperCase()+':', ...(r.recurring_mistakes||[]).map(m=>`- ${m.mistake} (${t.where}: ${m.where})\n  ${t.fix}: ${m.fix}\n  ${t.phrase}: ${m.phrase}`));
     L.push('', '🛡️ '+t.objs.toUpperCase()+':', ...(r.objections||[]).map(o=>`- ${o.objection} (${t.often}: ${o.how_often})\n  ${t.strong}: ${o.best_response}`));
+    if((r.weak_stages||[]).length) L.push('', '📉 '+(c.lang==='es'?'ETAPAS MÁS DÉBILES':'СЛАБЫЕ ЭТАПЫ')+':', ...r.weak_stages.map(x=>'- '+x));
+    if(r.check_summary) L.push('', '💶 '+r.check_summary);
     L.push('', '🎯 '+t.prio.toUpperCase()+':', ...(r.priorities||[]).map(x=>'- '+x));
     L.push('', '🏋️ '+t.plan.toUpperCase()+':', ...(r.training_plan||[]).map(x=>'- '+x));
     return L.join('\n');
@@ -511,7 +542,7 @@ function plainText(c){
   const r = c.report||{}, t = T[c.lang||'ru'], L = [];
   L.push(`${t.title}: ${c.name} (${c.date})`, '');
   if(!r.error){
-    L.push(`${t.score}: ${r.score}/10`, `${t.outcome}: ${r.outcome}`, '', '📄 '+t.resume.toUpperCase()+':', r.summary||'', '');
+    L.push(LINES[lineOf(c)].name, `${t.score}: ${r.score}/10`, `${t.outcome}: ${r.outcome}`, ...(r.sale?[`💶 ${r.sale}`]:[]), ...(r.check_note?[r.check_note]:[]), '', '📄 '+t.resume.toUpperCase()+':', r.summary||'', '');
     if((r.stages||[]).length){ L.push(t.stages.toUpperCase()+':'); r.stages.forEach(x=>L.push(`- ${x.name}: ${x.score}/10 — ${x.comment}`)); }
     L.push('', '✅ '+t.strengths.toUpperCase()+':', ...(r.strengths||[]).map(x=>'- '+x));
     L.push('', '❌ '+t.mistakes.toUpperCase()+':', ...(r.mistakes||[]).map(m=>`- «${m.quote}» — ${m.problem}\n  ${t.better}: ${m.better}`));
