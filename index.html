@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v19</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v20</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -223,6 +223,7 @@ async function groq(path, body, isForm){
       const msg = (err.error&&err.error.message)||'';
       const m = msg.match(/try again in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)?s?/i);
       const ra = parseFloat(r.headers.get('retry-after')) || (m ? (+m[1]||0)*3600+(+m[2]||0)*60+(+m[3]||0) : 15);
+      if(isForm && (ra>90 || /per (day|hour)/i.test(msg))){ const e = new Error('AUDIO_LIMIT'); e.wait = ra; throw e; }
       if((ra>90 || /per day/i.test(msg)) && !isForm){ // дневной лимит модели исчерпан: берём следующую бесплатную модель
         status('Лимит модели на сегодня исчерпан, переключаюсь на другую…');
         throw new Error('лимит '+body.model);
@@ -300,17 +301,31 @@ function wav(samples, rate){
 }
 
 /* ---------- pipeline ---------- */
+const WHISPER = ['whisper-large-v3-turbo','whisper-large-v3'], badWhisper = new Set();
 async function transcribe(file){
+  if(WHISPER.every(m => badWhisper.has(m))) badWhisper.clear();
   const parts = await splitAudio(file);
   const segs = []; let language = '';
   for(let i=0;i<parts.length;i++){
     status(`Расшифровываю аудио${parts.length>1?` (часть ${i+1} из ${parts.length})`:''}…`, 10+40*i/parts.length);
-    const fd = new FormData();
-    fd.append('file', parts[i].blob, parts[i].name);
-    fd.append('model','whisper-large-v3-turbo');
-    fd.append('response_format','verbose_json');
-    if($('lang').value) fd.append('language', $('lang').value);
-    const d = await groq('/audio/transcriptions', fd, true);
+    let d, waitMax = 0;
+    for(const wm of WHISPER.filter(m => !badWhisper.has(m))){
+      const fd = new FormData();
+      fd.append('file', parts[i].blob, parts[i].name);
+      fd.append('model', wm);
+      fd.append('response_format','verbose_json');
+      if($('lang').value) fd.append('language', $('lang').value);
+      try{ d = await groq('/audio/transcriptions', fd, true); break; }
+      catch(e){
+        if(e.message!=='AUDIO_LIMIT') throw e;
+        badWhisper.add(wm); waitMax = Math.max(waitMax, e.wait||0);
+        status('Лимит расшифровки на этой модели исчерпан, пробую запасную…');
+      }
+    }
+    if(!d){
+      const m = Math.ceil(waitMax/60), h = Math.floor(m/60);
+      throw new Error(`Бесплатный лимит расшифровки звука Groq на сейчас исчерпан (до 2 часов аудио в час и 8 часов в день на каждую из двух моделей). Можно продолжить примерно через ${h?h+' ч '+(m%60)+' мин':m+' мин'}. Разборы уже готовых звонков в истории работают.`);
+    }
     language = language || d.language || '';
     (d.segments||[{start:0,text:d.text}]).forEach(s => { const t=(s.text||'').trim(); if(t) segs.push({start:s.start+parts[i].offset, text:t}); });
   }
