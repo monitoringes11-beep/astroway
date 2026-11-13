@@ -63,7 +63,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v6</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v7</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -332,9 +332,9 @@ function rulesBlock(){
   return r ? `\nПРАВИЛА КОМПАНИИ (обязательны). Нарушение правила оператором — это ошибка: укажи её в mistakes со ссылкой на правило. Все советы, «better», «best_response», «phrase» и «script» должны строго соблюдать эти правила (никогда не предлагай то, что они запрещают):\n${r}\n` : '';
 }
 const T = {
-  ru:{O:'Оператор',C:'Клиент',title:'РАЗБОР ЗВОНКА',score:'Оценка',outcome:'Итог',stages:'Этапы продажи',strengths:'Что получилось',mistakes:'Ошибки оператора',noMistakes:'Явных ошибок нет',better:'Лучше',objections:'Возражения клиента',noObj:'Возражений не было',op:'Оператор',strong:'Сильный ответ',recs:'Рекомендации',script:'Улучшенный скрипт',dialog:'ДИАЛОГ',lang:'русском',sum:'Сводный разбор оператора',calls:'звонков',avg:'Средняя оценка',rec:'Повторяющиеся ошибки',where:'Где',fix:'Как исправить',phrase:'Фраза',objs:'Типичные возражения',often:'Как часто',prio:'Главные приоритеты',plan:'План тренировки',perCall:'Оценки по звонкам',
+  ru:{O:'Оператор',C:'Клиент',title:'РАЗБОР ЗВОНКА',score:'Оценка',outcome:'Итог',stages:'Этапы продажи',strengths:'Что получилось',mistakes:'Ошибки оператора',noMistakes:'Явных ошибок нет',better:'Лучше',objections:'Возражения клиента',noObj:'Возражений не было',op:'Оператор',strong:'Сильный ответ',recs:'Рекомендации',script:'Улучшенный скрипт',dialog:'ДИАЛОГ',lang:'русском',resume:'Резюме звонка',resumes:'Резюме по каждому звонку',overall:'Общее резюме по всем звонкам',sum:'Сводный разбор оператора',calls:'звонков',avg:'Средняя оценка',rec:'Повторяющиеся ошибки',where:'Где',fix:'Как исправить',phrase:'Фраза',objs:'Типичные возражения',often:'Как часто',prio:'Главные приоритеты',plan:'План тренировки',perCall:'Оценки по звонкам',
       stageNames:'Приветствие и контакт|Выявление потребностей|Презентация|Работа с возражениями|Закрытие/следующий шаг',verdicts:'хорошо|частично|плохо'},
-  es:{O:'Operador',C:'Cliente',title:'ANÁLISIS DE LA LLAMADA',score:'Puntuación',outcome:'Resultado',stages:'Etapas de la venta',strengths:'Lo que hiciste bien',mistakes:'Errores del operador',noMistakes:'Sin errores evidentes',better:'Mejor así',objections:'Objeciones del cliente',noObj:'No hubo objeciones',op:'Operador',strong:'Respuesta recomendada',recs:'Recomendaciones',script:'Guion mejorado',dialog:'DIÁLOGO',lang:'español',sum:'Análisis global del operador',calls:'llamadas',avg:'Puntuación media',rec:'Errores que se repiten',where:'Dónde',fix:'Cómo corregirlo',phrase:'Frase',objs:'Objeciones típicas',often:'Frecuencia',prio:'Prioridades principales',plan:'Plan de entrenamiento',perCall:'Puntuación por llamada',
+  es:{O:'Operador',C:'Cliente',title:'ANÁLISIS DE LA LLAMADA',score:'Puntuación',outcome:'Resultado',stages:'Etapas de la venta',strengths:'Lo que hiciste bien',mistakes:'Errores del operador',noMistakes:'Sin errores evidentes',better:'Mejor así',objections:'Objeciones del cliente',noObj:'No hubo objeciones',op:'Operador',strong:'Respuesta recomendada',recs:'Recomendaciones',script:'Guion mejorado',dialog:'DIÁLOGO',lang:'español',resume:'Resumen de la llamada',resumes:'Resumen de cada llamada',overall:'Resumen general de todas las llamadas',sum:'Análisis global del operador',calls:'llamadas',avg:'Puntuación media',rec:'Errores que se repiten',where:'Dónde',fix:'Cómo corregirlo',phrase:'Frase',objs:'Objeciones típicas',often:'Frecuencia',prio:'Prioridades principales',plan:'Plan de entrenamiento',perCall:'Puntuación por llamada',
       stageNames:'Saludo y contacto|Detección de necesidades|Presentación|Manejo de objeciones|Cierre / siguiente paso',verdicts:'bien|parcial|mal'}
 };
 async function analyze(turns, language, lang){
@@ -346,7 +346,7 @@ async function analyze(turns, language, lang){
 Будь конкретным: опирайся на цитаты из разговора, не выдумывай того, чего не было.
 ${rulesBlock()}${lang==='es'?' Обращайся к оператору на «tú», доброжелательно, как тренер.':''}
 Верни JSON:
-{"summary":"суть звонка в 2-3 предложениях",
+{"summary":"резюме звонка в 3-4 предложениях: кто клиент и что ему нужно, что предложил оператор, как реагировал клиент, чем закончилось",
 "outcome":"чем закончился звонок",
 "score":число 1-10,
 "stages":[{"name":"${t.stageNames}","score":1-10,"comment":"коротко"}],
@@ -400,13 +400,13 @@ async function summarize(calls, lang){
 ${rulesBlock()}
 ВЕСЬ отчёт пиши строго на языке: ${t.lang}. Готовые фразы для оператора ("phrase", "best_response") — на языке звонков.${lang==='es'?' Обращайся к оператору на «tú», доброжелательно.':''}
 Верни JSON:
-{"overview":"общая картина в 2-3 предложениях",
+{"overview":"общее резюме по всем звонкам в 4-6 предложениях: уровень оператора, что получается стабильно, что мешает продавать, динамика от звонка к звонку",
 "strengths":["устойчивые сильные стороны"],
 "recurring_mistakes":[{"mistake":"ошибка","where":"в каких звонках (номера)","fix":"как исправить","phrase":"готовая фраза"}],
 "objections":[{"objection":"возражение","how_often":"сколько раз встречалось","best_response":"лучший ответ"}],
 "priorities":["3 главных приоритета на неделю"],
 "training_plan":["конкретные упражнения для тренировки"],
-"per_call":[{"call":номер,"score":1-10,"one_line":"главное по звонку в одну строку"}]}`;
+"per_call":[{"call":номер,"score":1-10,"summary":"резюме звонка в 2-3 предложениях: суть разговора и чем закончился","one_line":"главный вывод для оператора по этому звонку"}]}`;
   return chatJSON(sys, JSON.stringify(brief));
 }
 
@@ -426,8 +426,9 @@ function render(c){
   $('tab-report').innerHTML = `
     <div class="row" style="align-items:center">
       <div style="flex:0 0 auto"><div class="score">${esc(r.score??'—')}<span class="muted" style="font-size:16px">/10</span></div></div>
-      <div><b>${t.outcome}:</b> ${esc(r.outcome)}<br><span class="muted">${esc(r.summary)}</span></div>
+      <div><b>${t.outcome}:</b> ${esc(r.outcome)}</div>
     </div>
+    <h3>📄 ${t.resume}</h3><div class="item">${esc(r.summary)}</div>
     ${(r.stages||[]).length?`<h3>${t.stages}</h3>`+r.stages.map(x=>`<div class="item"><span class="pill">${esc(x.score)}/10</span> <b>${esc(x.name)}</b> — ${esc(x.comment)}</div>`).join(''):''}
     <h3>✅ ${t.strengths}</h3>${list(r.strengths)}
     <h3>❌ ${t.mistakes}</h3>${(r.mistakes||[]).map(m=>`<div class="item"><div class="q">«${esc(m.quote)}»</div><div class="bad">${esc(m.problem)}</div><div class="good">${t.better}: ${esc(m.better)}</div></div>`).join('')||`<p class="muted">${t.noMistakes}</p>`}
@@ -445,10 +446,11 @@ function renderSummary(c){
   $('tab-report').innerHTML = `
     <h2>${t.sum} · ${c.calls.length} ${t.calls}</h2>
     <div class="row" style="align-items:center">
-      <div style="flex:0 0 auto"><div class="score">${avg}<span class="muted" style="font-size:16px">/10</span></div><div class="muted">${t.avg}</div></div>
-      <div>${esc(r.overview)}</div>
+      <div style="flex:0 0 auto"><div class="score">${avg}<span class="muted" style="font-size:16px">/10</span></div></div>
+      <div class="muted">${t.avg}</div>
     </div>
-    <h3>${t.perCall}</h3>${(r.per_call||[]).map(x=>`<div class="item"><span class="pill">${esc(x.score)}/10</span> <b>#${esc(x.call)}</b> ${esc((c.calls[x.call-1]||{}).name||'')} — ${esc(x.one_line)}</div>`).join('')}
+    <h3>📋 ${t.overall}</h3><div class="item">${esc(r.overview)}</div>
+    <h3>📄 ${t.resumes}</h3>${(r.per_call||[]).map(x=>{ const cc=c.calls[x.call-1]||{}; const rr=cc.report||{}; return `<div class="item"><span class="pill">${esc(x.score??cc.score)}/10</span> <b>#${esc(x.call)} ${esc(cc.name||'')}</b><div style="margin-top:4px">${esc(x.summary||rr.summary||'')}</div>${(rr.outcome&&!x.summary)?`<div class="muted">${t.outcome}: ${esc(rr.outcome)}</div>`:''}${x.one_line?`<div class="good">→ ${esc(x.one_line)}</div>`:''}</div>`; }).join('')}
     <h3>✅ ${t.strengths}</h3>${list(r.strengths)}
     <h3>❌ ${t.rec}</h3>${(r.recurring_mistakes||[]).map(m=>`<div class="item"><b class="bad">${esc(m.mistake)}</b> <span class="pill">${t.where}: ${esc(m.where)}</span><div>${t.fix}: ${esc(m.fix)}</div><div class="good">${t.phrase}: ${esc(m.phrase)}</div></div>`).join('')||`<p class="muted">${t.noMistakes}</p>`}
     <h3>🛡️ ${t.objs}</h3>${(r.objections||[]).map(o=>`<div class="item"><b>${esc(o.objection)}</b> <span class="pill">${t.often}: ${esc(o.how_often)}</span><div class="good">${t.strong}: ${esc(o.best_response)}</div></div>`).join('')||`<p class="muted">${t.noObj}</p>`}
@@ -486,7 +488,7 @@ function plainText(c){
   if(c.multi){
     const r = c.report||{}, t = T[c.lang||'ru'], L = [`${t.sum.toUpperCase()} (${c.calls.length} ${t.calls}, ${c.date})`, ''];
     if(r.error) return L.join('\n');
-    L.push(r.overview||'', '', t.perCall.toUpperCase()+':', ...(r.per_call||[]).map(x=>`- #${x.call} ${(c.calls[x.call-1]||{}).name||''}: ${x.score}/10 — ${x.one_line}`));
+    L.push('📋 '+t.overall.toUpperCase()+':', r.overview||'', '', '📄 '+t.resumes.toUpperCase()+':', ...(r.per_call||[]).map(x=>{ const cc=c.calls[x.call-1]||{}; return `#${x.call} ${cc.name||''} — ${x.score??cc.score}/10\n${x.summary||(cc.report||{}).summary||''}${x.one_line?'\n→ '+x.one_line:''}\n`; }));
     L.push('', '✅ '+t.strengths.toUpperCase()+':', ...(r.strengths||[]).map(x=>'- '+x));
     L.push('', '❌ '+t.rec.toUpperCase()+':', ...(r.recurring_mistakes||[]).map(m=>`- ${m.mistake} (${t.where}: ${m.where})\n  ${t.fix}: ${m.fix}\n  ${t.phrase}: ${m.phrase}`));
     L.push('', '🛡️ '+t.objs.toUpperCase()+':', ...(r.objections||[]).map(o=>`- ${o.objection} (${t.often}: ${o.how_often})\n  ${t.strong}: ${o.best_response}`));
@@ -497,7 +499,7 @@ function plainText(c){
   const r = c.report||{}, t = T[c.lang||'ru'], L = [];
   L.push(`${t.title}: ${c.name} (${c.date})`, '');
   if(!r.error){
-    L.push(`${t.score}: ${r.score}/10`, `${t.outcome}: ${r.outcome}`, r.summary||'', '');
+    L.push(`${t.score}: ${r.score}/10`, `${t.outcome}: ${r.outcome}`, '', '📄 '+t.resume.toUpperCase()+':', r.summary||'', '');
     if((r.stages||[]).length){ L.push(t.stages.toUpperCase()+':'); r.stages.forEach(x=>L.push(`- ${x.name}: ${x.score}/10 — ${x.comment}`)); }
     L.push('', '✅ '+t.strengths.toUpperCase()+':', ...(r.strengths||[]).map(x=>'- '+x));
     L.push('', '❌ '+t.mistakes.toUpperCase()+':', ...(r.mistakes||[]).map(m=>`- «${m.quote}» — ${m.problem}\n  ${t.better}: ${m.better}`));
