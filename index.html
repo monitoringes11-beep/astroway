@@ -49,7 +49,7 @@ label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
 .pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:20px;background:var(--accent-soft);color:var(--accent)}
 .item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
 .item .q{font-style:italic;color:var(--muted)}
-.item .bad{color:var(--bad)}.item .good{color:var(--ok)}
+.item .bad,.bad{color:var(--bad)}.item .good,.good{color:var(--ok)}
 ul{margin:6px 0;padding-left:20px}
 .hist a{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none;cursor:pointer}
 .hidden{display:none}
@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v22</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v23</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -92,6 +92,15 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
     </div>
     <div style="margin-top:10px"><label>Правила компании (ИИ проверяет звонки по ним и не советует того, что запрещено)</label>
       <textarea id="rules" rows="9" style="font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%"></textarea></div>
+    <div style="margin-top:12px;padding:10px;border:1px dashed var(--line);border-radius:10px">
+      <label>📦 Скрипты продуктов (таблица «Guion de productos Naturonica», файл .xlsx). Хранятся только в этом браузере.</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
+        <input type="file" id="prodFile" accept=".xlsx,.xls" style="max-width:320px">
+        <button id="btnProdDel">Удалить скрипты</button>
+        <span class="muted" id="prodInfo"></span>
+      </div>
+      <p class="muted" style="margin:6px 0 0">Как получить файл: открыть таблицу в Google → Файл → Скачать → Microsoft Excel (.xlsx). Файл можно также просто перетащить в поле для звонков.</p>
+    </div>
     <p class="muted">Ключ получить бесплатно: <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a></p>
     <div class="actions"><button class="primary" id="btnSave">Сохранить</button></div>
   </div>
@@ -205,10 +214,61 @@ const fmt = t => { t=Math.max(0,Math.round(t||0)); return Math.floor(t/60)+':'+S
 /* ---------- file input ---------- */
 const drop = $('drop');
 drop.onclick = () => $('file').click();
-$('file').onchange = e => e.target.files.length && runMany([...e.target.files]);
+const splitXlsx = files => { const x = files.filter(f => /\.xlsx?$/i.test(f.name)); x.forEach(importProducts); return files.filter(f => !/\.xlsx?$/i.test(f.name)); };
+$('file').onchange = e => { const f = splitXlsx([...e.target.files]); if(f.length) runMany(f); };
 ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
-drop.addEventListener('drop', e => e.dataTransfer.files.length && runMany([...e.dataTransfer.files]));
+drop.addEventListener('drop', e => { const f = splitXlsx([...e.dataTransfer.files]); if(f.length) runMany(f); });
+
+/* ---------- product scripts (xlsx, stored locally) ---------- */
+const GENERAL_SHEETS = ['INICIO','COMBINACIÓN','LLAMADA','PRECIOS','OBJ INICIALES'];
+const norm = x => (x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function prodInfo(){
+  const p = LS.get('products', null);
+  const n = p ? Object.keys(p.items||{}).length : 0;
+  $('prodInfo').textContent = n ? `Загружено продуктов: ${n} (${p.date})` : 'Скрипты продуктов не загружены';
+}
+function loadScript(src){ return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src=src; sc.onload=res; sc.onerror=()=>rej(new Error('Не удалось загрузить модуль чтения Excel')); document.head.appendChild(sc); }); }
+async function importProducts(file){
+  try{
+    status('Читаю таблицу продуктов…', 20);
+    if(!window.XLSX) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const wb = XLSX.read(await file.arrayBuffer(), {type:'array'});
+    const items = {}, general = {};
+    wb.SheetNames.forEach(name => {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, raw:false, defval:''});
+      const txt = rows.map(r => r.map(c => String(c).trim()).filter(Boolean).join(' | ')).filter(Boolean).join('\n');
+      if(!txt) return;
+      if(GENERAL_SHEETS.includes(name.trim().toUpperCase())) general[name.trim()] = txt; else items[name.trim()] = txt;
+    });
+    if(!Object.keys(items).length) throw new Error('В файле не найдено листов с продуктами.');
+    LS.set('products', {date:new Date().toLocaleDateString('ru-RU'), items, general});
+    prodInfo(); status(`Скрипты продуктов загружены: ${Object.keys(items).length}. Теперь презентация сверяется со скриптом продукта.`, 100);
+  }catch(e){ status('⚠️ '+e.message, 0); }
+  finally{ $('prodFile').value=''; }
+}
+function productKeys(name){
+  const keys = new Set();
+  name.split(/[/_]/).forEach(part => {
+    const w = norm(part).trim().split(/\s+/).filter(Boolean);
+    if(!w.length) return;
+    keys.add(w.join(' '));
+    if(w[0].length >= 5 && w[0] !== 'qeep') keys.add(w[0].slice(0, Math.min(6, w[0].length)));
+    if(w[0] === 'qeep' && w[1]) keys.add(w[1]);
+  });
+  return [...keys];
+}
+function detectProducts(turns){
+  const p = LS.get('products', null); if(!p) return [];
+  const text = norm(turns.map(t=>t.t).join(' ')).replace(/[^a-z0-9 ]+/g,' ');
+  return Object.keys(p.items).filter(name => productKeys(name).some(k => text.includes(k))).slice(0, 3);
+}
+function productBlock(names){
+  const p = LS.get('products', null); if(!p || !names.length) return '';
+  return `\nСКРИПТЫ ПРОДУКТОВ (из таблицы «Guion de productos Naturonica»). В звонке обсуждается: ${names.join(', ')}. Сверяй с этим скриптом презентацию продукта, вопросы на выявление потребностей, способ приёма, запреты из раздела «NO DIGA» и цены (столбец Base — вторая линия, Telemarketing — первая линия ОЛ). Если оператор хотя бы частично говорил по скрипту продукта или дал из него хоть какую-то верную информацию — это ПЛЮС: обязательно отметь это в "used" и в "strengths" и учитывай в оценке. Всё, что оператор сказал не так, как в скрипте, или что запрещено в «NO DIGA», — отметь с цитатой и правильным вариантом из скрипта.\n` + names.map(n => `=== ${n} ===\n${p.items[n]}`).join('\n\n') + '\n';
+}
+$('prodFile').onchange = e => e.target.files[0] && importProducts(e.target.files[0]);
+$('btnProdDel').onclick = () => { if(confirm('Удалить загруженные скрипты продуктов из этого браузера?')){ localStorage.removeItem('products'); prodInfo(); } };
 
 /* ---------- groq calls ---------- */
 async function groq(path, body, isForm){
@@ -315,6 +375,7 @@ async function transcribe(file){
       fd.append('model', wm);
       fd.append('response_format','verbose_json');
       if($('lang').value) fd.append('language', $('lang').value);
+      { const pp = LS.get('products', null); if(pp) fd.append('prompt', ('Naturonica. ' + Object.keys(pp.items).join(', ') + '.').slice(0, 600)); }
       try{ d = await groq('/audio/transcriptions', fd, true); break; }
       catch(e){
         if(e.message!=='AUDIO_LIMIT') throw e;
@@ -462,7 +523,9 @@ ${L.regs?`"crm_status":"какой статус по регламенту нуж
 "script":"короткий улучшенный вариант ключевого момента звонка"}`;
   const resTxt = result==='ok' ? 'Оператор поставил этому звонку статус ПОДТВЕРЖДЕНИЕ (заказ подтверждён). Проверь, правильно ли это по правилам.\n' : result==='no' ? 'Оператор поставил этому звонку статус ОТКАЗ. Проверь, правильно ли это по правилам (не должен ли быть Дубль, Перезвон и т.п.) и не слил ли оператор заказ.\n' : '';
   const dlg = dialogText(turns, {O:'Оператор', C:'Клиент'});
-  const rep = await chatJSON(sys, ctx + resTxt + 'Разбери ВЕСЬ разговор от начала до конца, включая его конец.\n' + dlg);
+  const prods = detectProducts(turns);
+  const sysP = prods.length ? sys.replace('\nВерни JSON:', productBlock(prods) + '\nВерни JSON:').replace('"stages":[', '"product_check":{"product":"какой продукт обсуждали","presentation":"насколько презентация соответствует скрипту продукта (коротко)","used":["что из скрипта продукта оператор сказал (это плюс оператору)"],"missed":["что важное из скрипта продукта оператор пропустил"],"wrong":["что сказано неверно или запрещено в «NO DIGA»: цитата → как правильно по скрипту"]},\n"stages":[') : sys;
+  const rep = await chatJSON(sysP, ctx + resTxt + 'Разбери ВЕСЬ разговор от начала до конца, включая его конец.\n' + dlg);
   // если модель что-то пропустила (бывает на длинных звонках) — дозапрашиваем недостающие блоки
   const empty = k => !rep[k] || (Array.isArray(rep[k]) && !rep[k].length);
   const miss = ['strengths','mistakes','recommendations','script','summary'].filter(empty);
@@ -475,6 +538,7 @@ ${L.regs?`"crm_status":"какой статус по регламенту нуж
       miss.forEach(k => { if(add[k] && (!Array.isArray(add[k]) || add[k].length)) rep[k] = add[k]; });
     }catch(e){}
   }
+  if(prods.length && rep.product_check && !rep.product_check.product) rep.product_check.product = prods.join(', ');
   return rep;
 }
 
@@ -516,7 +580,7 @@ async function runMany(files){
 async function summarize(calls, lang, line){
   const t = T[lang||'ru']; const L = LINES[line||'ol'];
   status(lang==='es'?'Готовлю сводный отчёт на испанском…':'Готовлю сводный разбор по всем звонкам…', 92);
-  const brief = calls.map((c,i)=>({call:i+1, name:c.name, score:c.report.score, outcome:c.report.outcome, sale:c.report.sale, crm_status:c.report.crm_status, status_audit:c.report.status_audit, drain:c.report.drain, regulation_fails:(c.report.checklist||[]).filter(x=>x.ok===false).map(x=>x.item), stages:c.report.stages, strengths:c.report.strengths, mistakes:c.report.mistakes, objections:c.report.objections, recommendations:c.report.recommendations}));
+  const brief = calls.map((c,i)=>({call:i+1, name:c.name, score:c.report.score, outcome:c.report.outcome, sale:c.report.sale, crm_status:c.report.crm_status, status_audit:c.report.status_audit, product_check:c.report.product_check, drain:c.report.drain, regulation_fails:(c.report.checklist||[]).filter(x=>x.ok===false).map(x=>x.item), stages:c.report.stages, strengths:c.report.strengths, mistakes:c.report.mistakes, objections:c.report.objections, recommendations:c.report.recommendations}));
   const sys = `Ты — опытный тренер по продажам. Ниже разборы нескольких звонков ОДНОГО оператора. Сделай сводный разбор: найди закономерности, повторяющиеся ошибки и сильные стороны, а не пересказывай каждый звонок.
 ЛИНИЯ И ЭТАПЫ ПРОДАЖ: ${L.rules}
 Отдельно оцени, на каких этапах оператор стабильно проседает, и как его продажи соотносятся с нормой чека группы.
@@ -555,6 +619,7 @@ function render(c){
       <div><span class="pill">${esc(LINES[lineOf(c)].short)}</span>${resPill(c,lang)} <b>${t.outcome}:</b> ${esc(r.outcome)}${r.sale?`<br><b>💶 ${lang==='es'?'Venta':'Продажа'}:</b> ${esc(r.sale)}`:''}${r.check_note?`<br><span class="muted">${esc(r.check_note)}</span>`:''}${r.status_audit&&r.status_audit.correct?`<br><b class="${r.status_audit.ok===false?'bad':''}">${r.status_audit.ok===false?'⚠️':'🏷️'} ${lang==='es'?'Estado correcto':'Правильный статус'}: ${esc(r.status_audit.correct)}</b>${r.status_audit.ok===false?` <span class="muted">(${lang==='es'?'de hecho':'по факту'}: ${esc(r.status_audit.actual)})</span>`:''}${r.status_audit.reason?`<br><span class="muted">${esc(r.status_audit.reason)}</span>`:''}`:''}${r.crm_status?`<br><b>🏷️ ${lang==='es'?'Estado en CRM':'Статус в CRM'}:</b> ${esc(r.crm_status)}`:''}${r.drain&&!/^(нет|no)\b/i.test(r.drain)?`<br><b class="bad">⚠️ ${lang==='es'?'Pérdida del pedido':'Слив заказа'}:</b> ${esc(r.drain)}`:''}${r.trap_words&&!/^(нет|no)\b/i.test(r.trap_words)?`<br><span class="muted">${lang==='es'?'Palabras trampa':'Слова-ловушки'}: ${esc(r.trap_words)}</span>`:''}</div>
     </div>
     <h3>📄 ${t.resume}</h3><div class="item">${esc(r.summary)}</div>
+    ${r.product_check?`<h3>📦 ${lang==='es'?'Producto según el guion':'Продукт по скрипту'}: ${esc(r.product_check.product||'')}</h3>${r.product_check.presentation?`<p>${esc(r.product_check.presentation)}</p>`:''}${(r.product_check.used||[]).length?`<b class="good">${lang==='es'?'Usó del guion (punto a favor)':'Сказал по скрипту (плюс)'}:</b>${list(r.product_check.used)}`:''}${(r.product_check.missed||[]).length?`<b>${lang==='es'?'Faltó':'Пропущено'}:</b>${list(r.product_check.missed)}`:''}${(r.product_check.wrong||[]).length?`<b class="bad">${lang==='es'?'Incorrecto / prohibido':'Неверно / запрещено'}:</b>${list(r.product_check.wrong)}`:''}`:''}
     ${(r.stages||[]).length?`<h3>${t.stages}</h3>`+r.stages.map(x=>`<div class="item"><span class="pill">${esc(x.score)}/10</span> <b>${esc(x.name)}</b> — ${esc(x.comment)}</div>`).join(''):''}
     ${(r.checklist||[]).length?`<h3>📋 ${lang==='es'?'Cumplimiento del reglamento':'Чек-лист регламента'}</h3>`+r.checklist.map(x=>`<div class="item">${x.ok===true?'✅':x.ok===false?'❌':'➖'} <b>${esc(x.item)}</b>${x.comment?` — ${esc(x.comment)}`:''}</div>`).join(''):''}
     <h3>✅ ${t.strengths}</h3>${list(r.strengths)}
@@ -634,6 +699,7 @@ function plainText(c){
   if(!r.error){
     L.push(LINES[lineOf(c)].name + (RES[c.result]?' · '+RES[c.result][c.lang||'ru']:''), `${t.score}: ${r.score}/10`, `${t.outcome}: ${r.outcome}`, ...(r.sale?[`💶 ${r.sale}`]:[]), ...(r.check_note?[r.check_note]:[]), ...(r.status_audit&&r.status_audit.correct?[`${r.status_audit.ok===false?'⚠️':'🏷️'} ${c.lang==='es'?'Estado correcto':'Правильный статус'}: ${r.status_audit.correct}${r.status_audit.ok===false?' ('+(c.lang==='es'?'de hecho':'по факту')+': '+r.status_audit.actual+')':''}${r.status_audit.reason?' — '+r.status_audit.reason:''}`]:[]), ...(r.crm_status?['🏷️ CRM: '+r.crm_status]:[]), ...(r.drain&&!/^(нет|no)\b/i.test(r.drain)?['⚠️ '+r.drain]:[]), '', '📄 '+t.resume.toUpperCase()+':', r.summary||'', '');
     if((r.checklist||[]).length){ L.push((c.lang==='es'?'REGLAMENTO':'ЧЕК-ЛИСТ РЕГЛАМЕНТА')+':'); r.checklist.forEach(x=>L.push(`${x.ok===true?'✅':x.ok===false?'❌':'➖'} ${x.item}${x.comment?' — '+x.comment:''}`)); L.push(''); }
+    if(r.product_check){ const pc=r.product_check, es=c.lang==='es'; L.push('📦 '+(es?'PRODUCTO SEGÚN EL GUION':'ПРОДУКТ ПО СКРИПТУ')+': '+(pc.product||''), ...(pc.presentation?[pc.presentation]:[]), ...(pc.used||[]).map(x=>'+ '+(es?'Usó del guion: ':'По скрипту: ')+x), ...(pc.missed||[]).map(x=>'- '+(es?'Faltó: ':'Пропущено: ')+x), ...(pc.wrong||[]).map(x=>'- '+(es?'Incorrecto: ':'Неверно: ')+x), ''); }
     if((r.stages||[]).length){ L.push(t.stages.toUpperCase()+':'); r.stages.forEach(x=>L.push(`- ${x.name}: ${x.score}/10 — ${x.comment}`)); }
     L.push('', '✅ '+t.strengths.toUpperCase()+':', ...(r.strengths||[]).map(x=>'- '+x));
     L.push('', '❌ '+t.mistakes.toUpperCase()+':', ...(r.mistakes||[]).map(m=>`- «${m.quote}» — ${m.problem}\n  ${t.better}: ${m.better}`));
@@ -694,7 +760,7 @@ function renderHistory(){
 
 $('btnClearArchive').onclick = () => { const me = opName(); removeWhere(x=>(x.operator||'Без имени')!==me, 'Удалить весь архив других операторов ({n} разборов)? Звонки текущего оператора останутся.'); };
 $('btnClearMine').onclick = () => { const me = opName(); removeWhere(x=>(x.operator||'Без имени')===me, `Удалить все звонки оператора «${me}» ({n} разборов)?`); };
-loadSettings(); renderHistory();
+loadSettings(); prodInfo(); renderHistory();
 </script>
 </body>
 </html>
