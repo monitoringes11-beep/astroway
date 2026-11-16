@@ -23,6 +23,7 @@ import 'package:astroway/screens/horoscope.dart';
 import 'package:astroway/screens/numerology.dart';
 import 'package:astroway/screens/omens.dart';
 import 'package:astroway/screens/sunmoon.dart';
+import 'package:astroway/logic/feedback_sender.dart';
 import 'package:astroway/screens/feedback.dart';
 import 'package:astroway/screens/palm.dart';
 import 'package:astroway/screens/profiles.dart';
@@ -369,18 +370,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  test('обратная связь: письмо без личных данных', () {
-    final b = feedbackBody(
+  test('обратная связь: поля без личных данных и очередь без сети', () async {
+    final f = feedbackFields(
       mood: '🙂',
       kinds: {'✨ Не хватает'},
       sections: {'Сонник'},
       text: 'Нет слова вокзал',
       missed: ['вокзал'],
     );
-    expect(b, contains('Раздел: Сонник'));
-    expect(b, contains('Нет слова вокзал'));
-    expect(b, contains('не нашлось в соннике: вокзал'));
-    expect(b.contains('Анна'), isFalse);
+    expect(f['Раздел'], 'Сонник');
+    expect(f['Отзыв'], 'Нет слова вокзал');
+    expect(f['Не нашлось в соннике'], 'вокзал');
+    expect(f.values.join().contains('Анна'), isFalse);
+    SharedPreferences.setMockInitialValues({});
+    final sent = <Map<String, String>>[];
+    var online = false;
+    FeedbackSender.transport = (m) async {
+      if (online) sent.add(m);
+      return online;
+    };
+    expect(await FeedbackSender.send(f), isFalse);
+    expect(await FeedbackSender.queued(), 1);
+    online = true;
+    expect(await FeedbackSender.send({'Отзыв': 'второй'}), isTrue);
+    expect(await FeedbackSender.queued(), 0);
+    expect(sent.map((m) => m['Отзыв']), ['Нет слова вокзал', 'второй']);
   });
 
   testWidgets('экран обратной связи', (tester) async {

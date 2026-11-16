@@ -3,6 +3,7 @@ import 'data/dream_base.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'logic/feedback_sender.dart';
 import 'logic/memory.dart';
 import 'logic/profile.dart';
 import 'screens/home.dart';
@@ -14,6 +15,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await DreamBase.loadAsset();
   final store = await Store.open();
+  FeedbackSender.flushQueue(); // неотправленные отзывы уходят в фоне
   runApp(AstroWayApp(store: store));
 }
 

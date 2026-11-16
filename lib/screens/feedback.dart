@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../data/dream_base.dart';
+import '../logic/feedback_sender.dart';
 import '../main.dart';
 import '../theme.dart';
-
-/// Адрес, куда приходят отзывы. Пустой: почтовое приложение откроется без получателя.
-const feedbackEmail = '';
 
 const feedbackKinds = ['💛 Нравится', '😕 Не нравится', '✨ Не хватает', '🐞 Ошибка'];
 const feedbackSections = [
@@ -24,28 +21,21 @@ const feedbackSections = [
 ];
 const feedbackMoods = ['😍', '🙂', '😐', '🙁'];
 
-/// Собирает письмо. Имя и дата рождения не отправляются, только то, что человек выбрал и написал.
-String feedbackBody({
+/// Поля письма. Имя и дата рождения не отправляются, только то, что человек выбрал и написал.
+Map<String, String> feedbackFields({
   required String? mood,
   required Set<String> kinds,
   required Set<String> sections,
   required String text,
   List<String> missed = const [],
-}) {
-  final b = StringBuffer();
-  if (mood != null) b.writeln('Оценка: $mood');
-  if (kinds.isNotEmpty) b.writeln('Тип: ${kinds.join(', ')}');
-  if (sections.isNotEmpty) b.writeln('Раздел: ${sections.join(', ')}');
-  b.writeln();
-  b.writeln(text.trim());
-  if (missed.isNotEmpty) {
-    b.writeln();
-    b.writeln('Слова, которых не нашлось в соннике: ${missed.join('; ')}');
-  }
-  b.writeln();
-  b.writeln('AstroWay 1.0');
-  return b.toString();
-}
+}) => {
+  'Оценка': ?mood,
+  if (kinds.isNotEmpty) 'Тип': kinds.join(', '),
+  if (sections.isNotEmpty) 'Раздел': sections.join(', '),
+  if (text.trim().isNotEmpty) 'Отзыв': text.trim(),
+  if (missed.isNotEmpty) 'Не нашлось в соннике': missed.join('; '),
+  'Версия': 'AstroWay 1.0',
+};
 
 class FeedbackScreen extends StatefulWidget {
   final AppState app;
@@ -78,25 +68,33 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
   bool get _ready => _text.text.trim().isNotEmpty || _mood != null;
 
+  bool _sending = false;
+
   Future<void> _send() async {
-    final body = feedbackBody(
-      mood: _mood,
-      kinds: _kinds,
-      sections: _sections,
-      text: _text.text,
-      missed: _withMissed ? _missed : const [],
+    setState(() => _sending = true);
+    final ok = await FeedbackSender.send(
+      feedbackFields(
+        mood: _mood,
+        kinds: _kinds,
+        sections: _sections,
+        text: _text.text,
+        missed: _withMissed ? _missed : const [],
+      ),
     );
-    final uri = Uri(
-      scheme: 'mailto',
-      path: feedbackEmail,
-      query: 'subject=${Uri.encodeComponent('AstroWay: отзыв')}&body=${Uri.encodeComponent(body)}',
-    );
-    final ok = await launchUrl(uri);
     if (!mounted) return;
+    setState(() {
+      _sending = false;
+      _text.clear();
+      _mood = null;
+      _kinds.clear();
+      _sections.clear();
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          ok ? 'Спасибо! Осталось нажать «Отправить» в почте.' : 'Не нашлось почтового приложения на телефоне.',
+          ok
+              ? 'Спасибо! Отзыв отправлен.'
+              : 'Сейчас нет связи. Отзыв сохранён и отправится сам, когда появится интернет.',
         ),
       ),
     );
@@ -183,10 +181,13 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
             ),
           ],
           const SizedBox(height: 12),
-          FilledButton(onPressed: _ready ? _send : null, child: const Text('Отправить отзыв')),
+          FilledButton(
+            onPressed: _ready && !_sending ? _send : null,
+            child: Text(_sending ? 'Отправляю…' : 'Отправить отзыв'),
+          ),
           const SizedBox(height: 10),
           const Text(
-            'Откроется почта с готовым письмом. Имя и дата рождения не отправляются.',
+            'Отзыв уйдёт прямо из приложения. Имя и дата рождения не отправляются.',
             style: TextStyle(color: AW.soft, fontSize: 12.5),
           ),
         ],
