@@ -60,7 +60,11 @@ class ShareCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.asset('assets/images/witch-night.jpg', fit: BoxFit.cover, alignment: const Alignment(0, -0.6)),
+                    Image.asset(
+                      'assets/images/witch-night.jpg',
+                      fit: BoxFit.cover,
+                      alignment: const Alignment(0, -0.6),
+                    ),
                     const DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
