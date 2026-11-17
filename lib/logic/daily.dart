@@ -51,7 +51,7 @@ int elementOf(DateTime birthday) => signs.indexOf(signOf(birthday)) % 4;
 DayForecast forecastFor(Profile p, DateTime date, {required bool easy, WitchAnswer? recall}) {
   final el = elementOf(p.birthday);
   final slot = slotGroup(p.birthSlot);
-  final moon = moonFor(date).phase.index;
+  final moon = phaseOfDay(date).index; // фаза на начало суток: прогноз весь день один
   final sun = sunEnergyFor(date).index;
   final num = dayNumber(p.birthday, date).n;
   final female = switch (p.gender) {
