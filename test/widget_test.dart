@@ -147,6 +147,11 @@ void main() {
     expect(horoscopeFor(10, d).general, horoscopeFor(10, e).general);
     expect(horoscopeFor(10, d, easy: true).general, contains(RegExp(r'[^\x00-\u04ff]')));
     expect(horoscopeFor(10, d, week: true).week, hasLength(3));
+    final daily = dailyHoroscope(10, d);
+    expect(daily.map((b) => b.$1), ['Общий настрой', 'Общение', 'Дела и финансы', 'Итог дня']);
+    expect(daily.first.$2, contains('Скорпионам'));
+    expect(daily.map((b) => b.$2).join(), isNot(contains('{')));
+    expect(dailyHoroscope(10, e).map((b) => b.$2).join(), daily.map((b) => b.$2).join());
     expect(horoscopeFor(10, d).numbers.every((n) => n >= 1 && n <= 40), isTrue);
   });
 
