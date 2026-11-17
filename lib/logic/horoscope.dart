@@ -1,4 +1,6 @@
+import '../data/horoscope_bank.dart';
 import 'daily.dart';
+import 'moon.dart';
 import 'zodiac.dart';
 
 /// Гороскоп по знаку: на день, на неделю, восточный и совместимость.
@@ -137,6 +139,31 @@ Horoscope horoscopeFor(int sign, DateTime date, {bool week = false, bool easy = 
     [for (var i = 1; i <= 3; i++) stableHash('${key}n$i') % 40 + 1],
     week ? [for (var i = 0; i < 3; i++) '${weekParts[i]}: ${pick(moods, '$key$i').toLowerCase()}'] : null,
   );
+}
+
+/// Ежедневный гороскоп по знаку: четыре блока по 3–4 связных предложения.
+/// Смысл задают энергия Солнца и фаза Луны в этот день и стихия знака,
+/// день недели и черта знака вписываются в текст. Один день, один текст для знака.
+List<(String, String)> dailyHoroscope(int sign, DateTime date, {bool easy = false}) {
+  final key = '${signs[sign].name}|${dayKey(date)}|daily';
+  final sun = sunEnergyFor(date).index;
+  final moon = moonFor(date).phase.index;
+  final el = sign % 4;
+  String fill(String s) => s
+      .replaceAll('{day}', weekdayNames[date.weekday - 1])
+      .replaceAll('{signs}', signsDative[sign])
+      .replaceAll('{trait}', signTraits[sign]);
+  String p(List<String> l, String salt) => fill(pick(l, '$key$salt'));
+  String join(List<String> parts, String emoji) => easy ? '${parts.join(' ')} $emoji' : parts.join(' ');
+  return [
+    (
+      'Общий настрой',
+      join([p(moodOpenBySun[sun], 'o1'), p(moodMiddleByElement[el], 'o2'), p(moodCloseByMoon[moon], 'o3')], '✨'),
+    ),
+    ('Общение', join([p(talkByElement[el], 't1'), p(talkByMoon[moon], 't2'), p(talkEvening, 't3')], '💬')),
+    ('Дела и финансы', join([p(workBySun[sun], 'w1'), p(workTrait, 'w2'), p(moneyByMoon[moon], 'w3')], '💼')),
+    ('Итог дня', join([p(summaryBySun[sun], 's1'), p(summaryClose, 's2')], '🌙')),
+  ];
 }
 
 // ===== Восточный гороскоп =====
