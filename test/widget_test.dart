@@ -404,6 +404,7 @@ void main() {
     expect(await FeedbackSender.send({'Отзыв': 'второй'}), isTrue);
     expect(await FeedbackSender.queued(), 0);
     expect(sent.map((m) => m['Отзыв']), ['Нет слова вокзал', 'второй']);
+    expect(FeedbackSender.messageText(f), contains('Раздел: Сонник'));
   });
 
   testWidgets('экран обратной связи', (tester) async {
