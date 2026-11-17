@@ -7,7 +7,9 @@ import '../data/palm.dart';
 import '../logic/memory.dart';
 import '../logic/svg_path.dart';
 import '../main.dart';
+import '../logic/share_content.dart';
 import '../theme.dart';
+import '../widgets/share_card.dart';
 
 enum PalmTab { scheme, type, photo }
 
@@ -185,6 +187,7 @@ class _PalmScreenState extends State<PalmScreen> {
             }(), style: const TextStyle(height: 1.4)),
             const SizedBox(height: 10),
           ],
+          ShareButton(content: () => sharePalm(_answers, easy: easy)),
         ],
       ),
     );

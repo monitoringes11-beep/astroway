@@ -6,7 +6,9 @@ import 'package:speech_to_text/speech_to_text.dart';
 import '../logic/interpret.dart';
 import '../logic/memory.dart';
 import '../main.dart';
+import '../logic/share_content.dart';
 import '../theme.dart';
+import '../widgets/share_card.dart';
 
 /// Сонник: голос или текст → толкование по источникам + личная часть + вопрос волшебницы.
 class DreamScreen extends StatefulWidget {
@@ -212,6 +214,7 @@ class _DreamScreenState extends State<DreamScreen> {
                     signoff,
                     style: TextStyle(color: AW.gold, fontWeight: FontWeight.w700),
                   ),
+                  if (r.symbols.isNotEmpty) ShareButton(content: () => shareDream(r)),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),

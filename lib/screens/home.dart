@@ -7,7 +7,9 @@ import '../logic/moon.dart';
 import '../logic/profile.dart';
 import '../logic/zodiac.dart';
 import '../main.dart';
+import '../logic/share_content.dart';
 import '../theme.dart';
+import '../widgets/share_card.dart';
 import 'dream.dart';
 import 'feedback.dart';
 import 'horoscope.dart';
@@ -204,6 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: TextStyle(color: AW.soft, fontSize: 12.5),
                           ),
                         ),
+                      ShareButton(content: () => shareForecast(f, sign, _now)),
                     ],
                   ),
                 ),
