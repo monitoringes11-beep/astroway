@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v28</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v29</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -110,7 +110,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
       <div><label>Язык звонка</label>
         <select id="lang"><option value="">Определить автоматически</option><option value="es">Испанский</option><option value="ru">Русский</option><option value="en">Английский</option></select></div>
       <div><label>Линия / группа</label>
-        <select id="line"><option value="ol">Общая линия (ОЛ, первая)</option><option value="base">Вторая линия — «База»</option><option value="fiz">Вторая линия — «Физика»</option></select></div>
+        <select id="line"><option value="ol">Общая линия (ОЛ, первая)</option><option value="base">Вторая линия — «База»</option><option value="fiz">Вторая линия — «Физика»</option><option value="in">Входящая линия</option></select></div>
       <div><label>Оператор (своя папка)</label>
         <div style="display:flex;gap:8px"><input id="operator" list="opList" placeholder="Имя оператора, напр. María"><button id="btnNewOp" title="Начать нового оператора" style="white-space:nowrap">➕ Новый</button></div>
         <datalist id="opList"></datalist></div>
@@ -273,9 +273,14 @@ function detectProducts(turns){
   const text = norm(turns.map(t=>t.t).join(' ')).replace(/[^a-z0-9 ]+/g,' ');
   return Object.keys(p.items).filter(name => productKeys(name).some(k => text.includes(k))).slice(0, 3);
 }
+// оставляем из листа продукта только нужное для проверки: карточка, презентация, «NO DIGA», цены
+function trimProduct(txt){
+  const cut = (t, from, to) => { const a = t.search(from), b = t.search(to); return (a>=0 && b>a) ? t.slice(0,a) + t.slice(b) : t; };
+  return cut(cut(txt, /^2 · /m, /^3 · /m), /^4 · /m, /^5 · /m).slice(0, 3500);
+}
 function productBlock(names){
   const p = LS.get('products', null); if(!p || !names.length) return '';
-  return `\nСКРИПТЫ ПРОДУКТОВ (из таблицы «Guion de productos Naturonica»). В звонке обсуждается: ${names.join(', ')}. Сверяй с этим скриптом презентацию продукта, вопросы на выявление потребностей, способ приёма, запреты из раздела «NO DIGA» и цены по столбцу Base (это скрипт второй линии: База и Физика). Если оператор хотя бы частично говорил по скрипту продукта или дал из него хоть какую-то верную информацию — это ПЛЮС: обязательно отметь это в "used" и в "strengths" и учитывай в оценке. Всё, что оператор сказал не так, как в скрипте, или что запрещено в «NO DIGA», — отметь с цитатой и правильным вариантом из скрипта.\n` + names.map(n => `=== ${n} ===\n${p.items[n]}`).join('\n\n') + '\n';
+  return `\nСКРИПТЫ ПРОДУКТОВ (из таблицы «Guion de productos Naturonica»). В звонке обсуждается: ${names.join(', ')}. Сверяй с этим скриптом презентацию продукта, вопросы на выявление потребностей, способ приёма, запреты из раздела «NO DIGA» и цены по столбцу Base (это скрипт второй линии: База и Физика). Если оператор хотя бы частично говорил по скрипту продукта или дал из него хоть какую-то верную информацию — это ПЛЮС: обязательно отметь это в "used" и в "strengths" и учитывай в оценке. Всё, что оператор сказал не так, как в скрипте, или что запрещено в «NO DIGA», — отметь с цитатой и правильным вариантом из скрипта.\n` + names.map(n => `=== ${n} ===\n${trimProduct(p.items[n])}`).join('\n\n') + '\n';
 }
 $('prodFile').onchange = e => e.target.files[0] && importProducts(e.target.files[0]);
 $('btnProdDel').onclick = () => { if(confirm('Удалить загруженные скрипты продуктов из этого браузера?')){ localStorage.removeItem('products'); prodInfo(); } };
@@ -288,9 +293,11 @@ async function groq(path, body, isForm){
     const r = await fetch(API+path, {method:'POST',
       headers: isForm ? {Authorization:'Bearer '+key} : {Authorization:'Bearer '+key,'Content-Type':'application/json'},
       body: isForm ? body : JSON.stringify(body)});
+    if(r.status===413){ throw new Error('too large'); }
     if(r.status===429){
       const err = await r.json().catch(()=>({}));
       const msg = (err.error&&err.error.message)||'';
+      if(/request too large|Requested \d+|reduce your message/i.test(msg) && !isForm) throw new Error('too large');
       const m = msg.match(/try again in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)?s?/i);
       const ra = parseFloat(r.headers.get('retry-after')) || (m ? (+m[1]||0)*3600+(+m[2]||0)*60+(+m[3]||0) : 15);
       if(isForm && (ra>90 || /per (day|hour)/i.test(msg))){ const e = new Error('AUDIO_LIMIT'); e.wait = ra; throw e; }
@@ -324,14 +331,20 @@ async function modelQueue(){
   }catch{}
   return q.filter(m => !badModels.has(m));
 }
-async function chatJSON(system, user){
-  const q = await modelQueue(); let lastErr;
+const SMALL = /gpt-oss-20b|qwen|8b|scout/i;
+async function chatJSON(system, user, opt){
+  opt = opt || {};
+  let q = await modelQueue(); let lastErr;
+  if(opt.small) q = [...q.filter(m => SMALL.test(m)), ...q.filter(m => !SMALL.test(m))];
   for(const model of q){
     try{
-      const d = await groq('/chat/completions', {
-        model, temperature: 0.2, response_format: {type:'json_object'},
-        messages: [{role:'system',content:system},{role:'user',content:user}]
-      });
+      const body = {model, temperature: 0.2, response_format: {type:'json_object'}, max_completion_tokens: opt.max || 3000,
+        messages: [{role:'system',content:system},{role:'user',content:user}]};
+      if(/gpt-oss/.test(model)) body.reasoning_effort = 'low';
+      if(/qwen/.test(model)) body.reasoning_effort = 'none';
+      let d;
+      try{ d = await groq('/chat/completions', body); }
+      catch(e){ if(/reasoning|max_completion/i.test(e.message)){ delete body.reasoning_effort; body.max_tokens = body.max_completion_tokens; delete body.max_completion_tokens; d = await groq('/chat/completions', body); } else throw e; }
       const txt = (d.choices[0].message.content||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();
       return JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}')+1));
     }catch(e){
@@ -403,35 +416,25 @@ async function transcribe(file){
   return {segs, language};
 }
 
-const ROLE_PROMPT = `Ты получаешь расшифровку телефонного звонка продаж, разбитую на пронумерованные фрагменты [номер|время]. Определи, кто говорит: "O" — оператор/продавец (звонит или отвечает от компании, представляется, презентует, задаёт квалифицирующие вопросы), "C" — клиент.
-Верни КАЖДЫЙ фрагмент, ни одного не пропускай и не сокращай текст, даже если звонок длинный. Не объединяй разные фрагменты в одну реплику (у каждой реплики свой номер фрагмента). Если во фрагменте говорят оба, раздели его на реплики с тем же номером. Исправь только очевидные ошибки распознавания, смысл не меняй, язык оригинала сохраняй.
-Верни JSON: {"turns":[{"r":"O"|"C","s":номер_фрагмента,"t":"текст реплики"}]}`;
 
+const ROLE_PROMPT = `Ты получаешь расшифровку телефонного звонка продаж, разбитую на пронумерованные фрагменты [номер] текст. Для КАЖДОГО фрагмента определи, кто говорит: "O" — оператор (звонит от компании, представляется, презентует, называет цены, задаёт вопросы), "C" — клиент. Если во фрагменте говорят оба — укажи того, кто говорит больше.
+Верни JSON строго такого вида: {"roles":"OCOC..."} — строка из букв O и C, по одной букве на каждый фрагмент, в том же порядке, ровно столько букв, сколько фрагментов. Текст фрагментов не возвращай.`;
 async function assignRoles(segs){
-  const lines = segs.map((s,i)=>`[${i}|${fmt(s.start)}] ${s.text}`);
-  const chunks = []; let cur = [];
-  lines.forEach(l => { if(cur.join('\n').length + l.length > 3500 && cur.length){ chunks.push(cur); cur=[]; } cur.push(l); });
+  const chunks = []; let cur = [], len = 0;
+  segs.forEach((s,i) => { const l = `[${i}] ${s.text}`; if(len + l.length > 9000 && cur.length){ chunks.push(cur); cur=[]; len=0; } cur.push(i); len += l.length + 1; });
   if(cur.length) chunks.push(cur);
-  const turns = [];
+  const roles = []; let lastR = 'O';
   for(let i=0;i<chunks.length;i++){
     status(`Разделяю по ролям${chunks.length>1?` (${i+1}/${chunks.length})`:''}…`, 55+20*i/chunks.length);
-    const prev = turns.slice(-4).map(t=>`${t.r}: ${t.t}`).join('\n');
     const ctx = $('context').value ? `Контекст: оператор продаёт — ${$('context').value}.\n` : '';
-    let res = {turns:[]};
-    try{ res = await chatJSON(ROLE_PROMPT, ctx + (prev?`Последние реплики перед этим куском (для контекста, не включай их):\n${prev}\n\n`:'') + chunks[i].join('\n')); }catch(e){}
-    // проверка, что ни один фрагмент не потерялся: пропущенные вставляем с ролью соседней реплики
-    const idx = chunks[i].map(l => +l.slice(1, l.indexOf('|')));
-    const out = [];
-    let lastR = (turns[turns.length-1]||{}).r || 'O';
-    const byS = {}; (res.turns||[]).forEach(t => { (byS[+t.s] = byS[+t.s]||[]).push(t); });
-    idx.forEach(n => { if(byS[n]) byS[n].forEach(t => { out.push(t); lastR = t.r; }); else out.push({r:lastR, s:n, t:segs[n].text}); });
-    (res.turns||[]).filter(t => !idx.includes(+t.s)).forEach(t => out.push(t));
-    out.forEach(t => {
-      const seg = segs[t.s] || segs[0];
-      const r = t.r==='C'?'C':'O', last = turns[turns.length-1];
-      if(last && last.r===r) last.t += ' ' + t.t; else turns.push({r, t:t.t, start:seg?seg.start:0});
-    });
+    const prev = roles.length ? `Предыдущий фрагмент говорил: ${lastR}.\n` : '';
+    let str = '';
+    try{ const res = await chatJSON(ROLE_PROMPT, ctx + prev + `Фрагментов: ${chunks[i].length}\n` + chunks[i].map((n,k) => `[${k}] ${segs[n].text}`).join('\n'), {small:true, max:Math.min(3000, chunks[i].length*3+200)});
+      str = String(res.roles||'').toUpperCase().replace(/[^OC]/g,''); }catch(e){}
+    chunks[i].forEach((n,k) => { const r = str[k] || lastR; roles[n] = r; lastR = r; });
   }
+  const turns = [];
+  segs.forEach((sg,i) => { const r = roles[i]==='C'?'C':'O', last = turns[turns.length-1]; if(last && last.r===r) last.t += ' ' + sg.text; else turns.push({r, t:sg.text, start:sg.start}); });
   return turns;
 }
 
@@ -488,7 +491,17 @@ const LINES = {
 АВТООТВЕТЧИК/ТИШИНА: голосовая почта, «немой» звонок, не отвечает.
 ПЕРЕЗВОН: только с ясного согласия клиента и ДО любой информации о продукте, когда клиенту неудобно или он просит перезвонить позже; в течение 24 часов (на второй день работы оператора — только на тот же день). Запрещено: оставлять перезвоны другой группе; использовать перезвон для скрытых отказов или «догонов»; ставить перезвон, если разговора не было. Если продукт, бонусы или любая коммерческая информация уже прозвучали и клиент просит перезвонить — это ОТКАЗ (оператор записывает номер карточки и перезванивает сам).
 РУЧНОЙ НАБОР: отказ от перезвона, активация купона или новый заказ по просьбе клиента.
-ОТЛОЖЕННАЯ ДОСТАВКА (более 4 дней; это только про дату ДОСТАВКИ уже проданного заказа, а не про перезвон — перезвон дальше 24 часов запрещён): согласовать сумму, продукты и упаковки, записать адрес; при постобработке — заказ в Отказ, комментарий «Не трогать, этот заказ [имя оператора]», телефония «Не звонить»; при повторном подтверждении — ссылка от СВ, звонок клиенту, при «да» СВ подтверждает заказ на оператора.`}
+ОТЛОЖЕННАЯ ДОСТАВКА (более 4 дней; это только про дату ДОСТАВКИ уже проданного заказа, а не про перезвон — перезвон дальше 24 часов запрещён): согласовать сумму, продукты и упаковки, записать адрес; при постобработке — заказ в Отказ, комментарий «Не трогать, этот заказ [имя оператора]», телефония «Не звонить»; при повторном подтверждении — ссылка от СВ, звонок клиенту, при «да» СВ подтверждает заказ на оператора.`},
+  in:{name:'Входящая линия (Línea entrante UE)', short:'Входящая',
+    ru:'Приветствие по скрипту и имя клиента|Статус заказа и причина звонка|Работа с возражениями (минимум 3 попытки)|Продажа / увеличение заказа (2 программы с большей, +1 коробка, доп. продукт)|Проверка данных (ФИО, адрес с индексом, состав и сумма)|Договор-оферта и чёткое «да»|Завершение подтверждением и прощание',
+    es:'Saludo según el guion y nombre del cliente|Estado del pedido y motivo de la llamada|Manejo de objeciones (mínimo 3 intentos)|Venta / subir el ticket (2 programas desde el mayor, +1 caja, producto adicional)|Comprobación de datos (nombre, dirección con CP, contenido e importe)|Contrato de oferta y «sí» claro|Cierre con confirmación y despedida',
+    checks:'1 приветствие по скрипту и спросил имя клиента; 2 открыл карточку и правильно увидел статус заказа; 3 понял причину звонка / отказа; 4 отработал возражение аргументами (результат, продукт, акция, истории); 5 не сдался после первого «нет» (минимум 3 попытки); 6 проверил ФИО по слогам; 7 проверил полный адрес с почтовым индексом; 8 проверил состав и назвал итоговую сумму; 9 предупредил: точная сумма наличными, без сдачи; 10 предложил 2 программы с большей и молча ждал; 11 пытался поднять чек (+1 коробка / цена за коробку / программа по проблеме); 12 кросс-продажа по потребности клиента до итоговой суммы; 13 договор-оферта + чёткое «да»; 14 не назвал точное время доставки; 15 не отправлял информацию в WhatsApp/другие каналы; 16 закончил подтверждением и прощанием; 17-20 комментарий, кнопка, статус, Touchpoint/чат — оцени по разговору, если видно (иначе null)',
+    rules:`Звонок ВХОДЯЩЕЙ линии (Línea entrante UE, Naturonica). Три типа звонка: 1) звонит клиент (хочет отменить заказ, спросить о доставке/продукте, перенести дату, перезванивает на пропущенный, повторный заказ, жалоба); 2) оператор звонит по недоставленному заказу (OD / Sin contacto OD / En entrega / Recogerá más tarde) — согласовать новую дату и подтвердить выкуп; 3) заявка с сайта (En trabajo / No contesta / Volver a llamar) — оформить заказ по этапам продаж: потребности (вопросы весь звонок) → мост → презентация по потребности (как продукт действует именно на его организм, результат, как принимать) → мост → ДВЕ программы с большей: 9 коробок 165 € и 8 коробок 155 €, затем ПАУЗА → доп. продажа (+1 коробка за 10 € и/или доп. продукт по второй проблеме, 3 коробки 51 €) → итоговая сумма → условия доставки → проверка данных + оферта + прощание. Цель КАЖДОГО звонка — спасти заказ и получить чёткое подтверждение выкупа, по возможности увеличить заказ; разговор всегда заканчивается подтверждением.
+ПРЕДСТАВЛЕНИЕ (входящая линия): «Buenos días / buenas tardes, [имя клиента]. Me llamo [имя], de la empresa Naturonica, especialista de la línea de atención al cliente. Le escucho. ¿En qué puedo ayudarle?» Оператор должен назвать себя и компанию Naturonica и узнать причину звонка; затем по истории заказов найти заказ и его статус.
+ЗОЛОТЫЕ ПРАВИЛА ВХОДЯЩЕЙ ЛИНИИ (нарушение = ошибка): на входящей линии отработка отказа — МИНИМУМ 3 попытки (это строже общего правила «2 отработки»): спросить причину («¿qué le ha hecho cambiar de opinión?»), отработать, если не решилось — вернуться к потребности, показать последствия, описать результат и задать уточняющий вопрос «¿lo que le hace dudar es el precio o la eficacia del producto?». В КАЖДОМ звонке, где заказ остаётся в силе: проверить ФИО по слогам, полный адрес с почтовым индексом, второй телефон (если есть), число коробок с названием продукта и итоговую сумму; предупредить, что оплата наличными точной суммой, у курьера нет сдачи (карта — только где разрешено). ДОГОВОР-ОФЕРТА обязателен дословно по смыслу: «ahora soy responsable material de su pedido… nosotros le entregamos un producto de calidad por el precio acordado ([total] €, con la entrega incluida) y usted no nos falla y paga el pedido al recibirlo. ¿Confirma nuestro acuerdo?» Ответ клиента должен быть чётким («Sí», «Vale», «De acuerdo», «Claro, envíenlo»); «ya veremos», «intentaré», «espero que sí» — НЕ подтверждение, нужно выяснить сомнение и снова просить «да»; если после оферты были ещё вопросы — оферту повторить. ЗАПРЕЩЕНО называть точное время доставки: только дату, минимум через 2 дня от звонка (послезавтра). Никогда не отправлять информацию в WhatsApp и другие каналы (клиент получает только SMS курьерской службы). Никогда не продавать 1 коробку, минимальная программа 3–4 коробки. Прощание: «estoy seguro de que el resultado le va a encantar».
+СТАТУСЫ ЗАКАЗА И ДЕЙСТВИЯ: Confirmado / En preparación — можно менять данные, состав и цену (здесь можно и нужно поднимать чек); отмена → комментарий с причиной, кнопка RECHAZO DEL PEDIDO, статус ANULADO; спасён → проверка данных + оферта, комментарий, кнопка PEDIDO SALVADO, статус PEDIDO VERIFICADO; консультация → ответ, проверка данных + оферта, кнопка INFORMACIÓN, статус PEDIDO VERIFICADO. Enviado al almacén (FF) — ничего не меняется, отмена только через супервайзера, статус не меняется. Entregado a mensajería / En entrega / Entregado — отменить нельзя, статус не меняется (кнопки RECHAZO / PEDIDO SALVADO / INFORMACIÓN). OD / Sin contacto OD — согласовать НОВУЮ дату (мин. через 2 дня), спасён/консультация → статус RECOGERÁ MÁS TARDE, перезвон на следующий день после даты доставки, дата супервайзеру в чат; не спасён → DEVOLUCIÓN MANUAL; «уже забрал» → сверить состав и сумму → ENTREGADO MANUAL. Recogerá más tarde — статус не меняется. Devolución / Anulado — повторно не отправить; хочет получить → новый заказ через чат «Línea entrante», статус и кнопки не трогать. Devolución manual — заказ ещё у курьера, передумал → новый заказ НЕ создаётся, согласовать дату, проверка + оферта, INFORMACIÓN. Pagado / Entregado — консультация, повтор/жалоба → чат «Línea entrante» с супервайзером. Заявка с сайта после разговора: подтвердил → Confirmado; не захотел → Rechazo; отказ сразу после приветствия / «не оставлял заявку» / другой язык → Revisión del supervisor; неудобно говорить / просит позже → Volver a llamar (только в пределах 24 ч); кнопка CLIENTE NUEVO с тем же статусом; Touchpoint NO LLAMAR.
+КНОПКИ: RECHAZO DEL PEDIDO (не спасли, сначала причина в комментарии); PEDIDO SALVADO (хотел отменить, спасли: «Quería anular — caro, pedido salvado»); INFORMACIÓN (вопрос о доставке/продукте); RECLAMACIÓN (жалоба по оплаченному заказу); CLIENTE NUEVO (заявки с сайта). Порядок после звонка: комментарий → кнопка → статус (если нужно) → Touchpoint → чат (только если нужно).
+ВОЗРАЖЕНИЯ (эталонные ответы): «me lo voy a pensar / he cambiado de opinión» → уточняющий вопрос: цена или эффективность; «es caro» → инвестиция в здоровье, хватит тратить на временные решения, сохраняем условия акции; «hay más baratos» → дешевле = экономия на качестве, производство в ЕС; «¿y si no funciona?» → сертификаты ЕС, опыт клиентов, описать результат через N недель; «solo una caja» → одна коробка на 10–15 дней, проблема копилась годами, нужна программа; «en el anuncio pone 29 €» → это цена за коробку внутри полной программы; «quiero probarlo» → этапы: подготовка → восстановление → закрепление; «es una estafa» → оплата при получении, сертификаты ЕС, линия поддержки; врач ЗАПРЕТИЛ → не спорим с врачом, спросить причину, медицинская — оформить отказ; «lo consultaré con el médico» → уточнить: цена или эффективность; семья против → они не чувствуют вашу боль + уточняющий вопрос; аллергия → прочитать состав, при аллергене НЕ продаём, не обещать «0% аллергии»; уезжает → сменить получателя или успеет (хранение в пункте выдачи); «yo no he pedido nada» → заказ оформлен на ваше имя, адрес и телефон; «dejen de llamarme» → звонок автоматический после заявки; «tengo prisa» → 5–7 минут; «¿cuánto cuesta?» сразу → сначала город и акция, потом потребность, потом цена.`}
 };
 const RES = {ok:{ru:'✅ Подтверждение',es:'✅ Confirmado'}, no:{ru:'❌ Отказ',es:'❌ Rechazo'}};
 const resPill = (c,lang) => c && RES[c.result] ? ` <span class="pill ${c.result==='no'?'bad':''}">${RES[c.result][lang||'ru']}</span>` : '';
@@ -499,20 +512,43 @@ const T = {
   es:{O:'Operador',C:'Cliente',title:'ANÁLISIS DE LA LLAMADA',score:'Puntuación',outcome:'Resultado',stages:'Etapas de la venta',strengths:'Lo que hiciste bien',mistakes:'Errores del operador',noMistakes:'Sin errores evidentes',better:'Mejor así',objections:'Objeciones del cliente',noObj:'No hubo objeciones',op:'Operador',strong:'Respuesta recomendada',recs:'Recomendaciones',script:'Guion mejorado',dialog:'DIÁLOGO',lang:'español',resume:'Resumen de la llamada',resumes:'Resumen de cada llamada',overall:'Resumen general de todas las llamadas',sum:'Análisis global del operador',calls:'llamadas',avg:'Puntuación media',rec:'Errores que se repiten',where:'Dónde',fix:'Cómo corregirlo',phrase:'Frase',objs:'Objeciones típicas',often:'Frecuencia',prio:'Prioridades principales',plan:'Plan de entrenamiento',perCall:'Puntuación por llamada',
       stageNames:'Saludo y contacto|Detección de necesidades|Presentación|Manejo de objeciones|Cierre / siguiente paso',verdicts:'bien|parcial|mal'}
 };
-async function analyze(turns, language, lang, line, result){
-  lang = lang || LS.get('reportLang','es'); const t = T[lang]; const L = LINES[line||'ol'];
-  status(lang==='es'?'Готовлю отчёт на испанском…':'Анализирую разговор и готовлю рекомендации…', 82);
-  const ctx = $('context').value ? `Оператор продаёт: ${$('context').value}.\n` : '';
-  const sys = `Ты — опытный тренер по продажам и отработке возражений. Проанализируй звонок оператора с клиентом.
-ВЕСЬ отчёт пиши строго на языке: ${t.lang} — все пояснения, названия этапов, оценки, советы. Готовые фразы для оператора ("better", "better_response", "script") пиши на языке самого звонка${language?` (${language})`:''}, чтобы их можно было сразу использовать.
-Будь конкретным: опирайся на цитаты из разговора, не выдумывай того, чего не было. Разбирай звонок целиком, до последней реплики, даже если он длинный.
-ЗАПРЕЩЕНО НА ВСЕХ ЛИНИЯХ: в начале разговора спрашивать клиента, удобно ли ему говорить («¿Le viene bien hablar?», «¿Tiene un momento?», «¿Puede hablar ahora?», «удобно ли вам говорить» и любые похожие). Если оператор так спросил — это ошибка в "mistakes" с цитатой.
+const CONDENSE_PROMPT = `Ты помогаешь тренеру по продажам. Тебе дают кусок расшифровки звонка оператора колл-центра с клиентом. Сделай подробный конспект этого куска, чтобы по нему можно было оценить работу оператора, НЕ слушая звонок. Сохраняй язык оригинала. Обязательно дословно цитируй: приветствие и представление оператора, вопросы о потребностях и ответы клиента, ключевые фразы презентации (что говорилось о продукте и как его принимать), все названные цены и курсы, каждое возражение клиента и каждый ответ оператора, просьбы о перезвоне, прощание и итог (продажа/отказ, сумма, адрес, сроки доставки). Пиши по порядку с временными метками. Ничего не выдумывай.
+Верни JSON: {"notes":"конспект"}`;
+async function condenseDialog(dlg){
+  const parts = []; let cur = '';
+  dlg.split('\n').forEach(l => { if(cur.length + l.length > 9000 && cur){ parts.push(cur); cur=''; } cur += l + '\n'; });
+  if(cur) parts.push(cur);
+  const notes = [];
+  for(let i=0;i<parts.length;i++){
+    status(`Длинный звонок: готовлю конспект (часть ${i+1} из ${parts.length})…`, 76+6*i/parts.length);
+    try{ const r = await chatJSON(CONDENSE_PROMPT, `Часть ${i+1} из ${parts.length}:\n` + parts[i], {small:true, max:1800}); notes.push(`— Часть ${i+1} —\n` + (r.notes||'')); }
+    catch(e){ notes.push(`— Часть ${i+1} —\n` + parts[i].slice(0, 3500)); }
+  }
+  return notes.join('\n');
+}
+const GLOBAL_RULES = `ЗАПРЕЩЕНО НА ВСЕХ ЛИНИЯХ: в начале разговора спрашивать клиента, удобно ли ему говорить («¿Le viene bien hablar?», «¿Tiene un momento?», «¿Puede hablar ahora?», «удобно ли вам говорить» и любые похожие). Если оператор так спросил — это ошибка в "mistakes" с цитатой.
 ПЕРЕЗВОН НА ВСЕХ ЛИНИЯХ: перезвон ставится ТОЛЬКО на ближайшие 24 часа (сегодня позже или завтра). Оператор НЕ может сам предлагать перезвонить через несколько дней, неделю, 10 или 15 дней и т.п. Если клиент сам просит перезвонить через несколько дней / 10 / 15 дней — оператор НЕ должен соглашаться: это возражение, его нужно отработать и стараться продать сейчас. Если продать сейчас не получилось — это ОТКАЗ, а не перезвон. Если оператор предложил или согласился на перезвон дальше 24 часов — это грубая ошибка в "mistakes" с цитатой и вариантами отработки на языке звонка; правильный статус в таком случае — Отказ (или Подтверждение, если продал).
 Возражение «нет денег до пенсии / до зарплаты, позвоните, когда получу» — НЕ повод для перезвона. Доставка у нас 1–4 дня; если клиент хочет доставку на 5-й, 6-й день и позже после подтверждения — такой заказ идёт в ОТКАЗ, поэтому подтверждать нужно прямо сейчас с обычной доставкой. Правильная отработка: на складе осталось мало этого продукта, скидка действует только сегодня и завтра, поэтому лучше оформить сейчас пробный курс за 100 €, клиент получит его за 1–4 дня и оплатит только курьеру при получении — так начнём (или продолжим) следующий этап лечения без потери времени. Лучший вариант — подтвердить сейчас с доставкой 1–4 дня. Если клиент всё равно настаивает на доставке позже 4 дней — это оформляется как «Отложенная доставка»: заказ в Отказ с комментарием «No tocar, este pedido es de [имя оператора]» и телефония «No llamar», потом повторное подтверждение через ссылку от СВ. Обещать «я вам сама перезвоню, когда будет пенсия» без этой процедуры — ошибка. Ответ оператора «я сама вам перезвоню, когда будет пенсия» — ошибка.
 СТАТУС «НЕ ЗВОНИТЕ БОЛЬШЕ»: если клиент просто твёрдо просит больше не звонить — это ОТКАЗ (по отказам клиенту позже могут позвонить). Если клиент оскорбляет — ДУБЛЬ с комментарием причины: это конечный статус, по этой заявке больше не звонят. Статуса «No llamar» в CRM нет.
 ОБЯЗАТЕЛЬНО НА ВСЕХ ЛИНИЯХ: прежде чем попрощаться и поставить статус «Отказ», оператор должен отработать возражение клиента МИНИМУМ 2 раза. Посчитай, сколько раз оператор реально отработал возражения перед прощанием. Если меньше двух и клиент не бросил трубку сам — это грубая ошибка в "mistakes" (оператор сдался рано, возможный слив заказа): процитируй момент и дай 2 варианта отработки на языке звонка.
-${rulesBlock()}
-ЛИНИЯ И ЭТАПЫ ПРОДАЖ: ${L.rules}
+`;
+async function analyze(turns, language, lang, line, result){
+  lang = lang || LS.get('reportLang','es'); const t = T[lang]; const L = LINES[line||'ol'];
+  const ctx = $('context').value ? `Оператор продаёт: ${$('context').value}.\n` : '';
+  const resTxt = result==='ok' ? 'Оператор поставил этому звонку статус ПОДТВЕРЖДЕНИЕ (заказ подтверждён). Проверь, правильно ли это по правилам.\n' : result==='no' ? 'Оператор поставил этому звонку статус ОТКАЗ. Проверь, правильно ли это по правилам (не должен ли быть Дубль, Перезвон и т.п.) и не слил ли оператор заказ.\n' : '';
+  let dlg = dialogText(turns, {O:'Оператор', C:'Клиент'}), condensed = false;
+  if(dlg.length > 10000){ dlg = await condenseDialog(dlg); condensed = true; }
+  const src = ctx + resTxt + (condensed ? 'Ниже КОНСПЕКТ всего разговора с дословными цитатами (звонок длинный). Разбери весь разговор от начала до конца.\n' : 'Разбери ВЕСЬ разговор от начала до конца, включая его конец.\n') + dlg;
+  const rl = L.rules.split('\n');
+  const stagesText = rl[0], presText = rl.filter(x => x.startsWith('ПРЕДСТАВЛЕНИЕ')).join('\n'), restText = rl.slice(1).filter(x => !x.startsWith('ПРЕДСТАВЛЕНИЕ')).join('\n');
+  const head = `ВЕСЬ отчёт пиши строго на языке: ${t.lang}. Готовые фразы для оператора ("better", "better_response", "script") пиши на языке самого звонка${language?` (${language})`:''}. Опирайся на цитаты из разговора, не выдумывай того, чего не было.`;
+  // запрос 1: тренерский разбор (этапы, ошибки, возражения, советы)
+  status(lang==='es'?'Готовлю отчёт на испанском…':'Анализирую разговор и готовлю рекомендации…', 84);
+  const sysCore = `Ты — опытный тренер по продажам и отработке возражений. Проанализируй звонок оператора с клиентом.
+${head}
+${GLOBAL_RULES}${rulesBlock()}
+ЛИНИЯ И ЭТАПЫ ПРОДАЖ: ${stagesText}
+${presText}
 Оценивай звонок именно по этим этапам: в "stages" перечисли ВСЕ этапы этой линии в указанном порядке (даже если этап пропущен — тогда низкая оценка и пометка «пропущен»).${lang==='es'?' Обращайся к оператору на «tú», доброжелательно, как тренер.':''}
 Верни JSON:
 {"summary":"резюме звонка в 3-4 предложениях: кто клиент и что ему нужно, что предложил оператор, как реагировал клиент, чем закончилось",
@@ -520,31 +556,47 @@ ${rulesBlock()}
 "score":число 1-10,
 "sale":"что и за сколько продано (курс, число упаковок, сумма в €) или «нет продажи»",
 "check_note":"сравнение суммы с нормой группы (средний и минимальный чек), если применимо; иначе пусто",
-"status_audit":{"actual":"какой итог по факту (подтверждён / отказ / другое)","correct":"какой статус должен стоять по правилам (Подтверждён, Отказ, Дубль, Перезвон, Проблема связи, Автоответчик, Отложенная доставка и т.п.)","ok":true|false,"reason":"по каким фразам/признакам в разговоре это видно"},
-${L.regs?`"crm_status":"какой статус по регламенту нужно поставить в CRM и почему (одной строкой)",
-"drain":"есть ли признаки СЛИВА заказа: «нет» или в чём слив",
-"trap_words":"какие слова-ловушки прозвучали (тогда невалид запрещён) или «нет»",
-"checklist":[{"item":"пункт регламента (представление по скрипту, без «удобно ли говорить», спокойный тон, потребности и презентация до цены, курсы по таблице, 2 отработки до минимального курса, данные заказа, полная стоимость, резюме заказа, сроки доставки, доп. продажа, оферта на выкуп)","ok":true|false|null,"comment":"коротко; null — не применимо"}],`:''}
 "stages":[{"name":"${L[lang]}","score":1-10,"comment":"коротко"}],
 "strengths":["что оператор сделал хорошо"],
 "mistakes":[{"quote":"цитата оператора","problem":"в чём ошибка","better":"как сказать лучше"}],
 "objections":[{"objection":"возражение клиента","operator_response":"как ответил оператор","verdict":"${t.verdicts}","better_response":"сильный ответ по технике (присоединение, уточнение, аргумент, вопрос-закрытие)"}],
 "recommendations":["конкретные советы оператору на следующий звонок"],
 "script":"короткий улучшенный вариант ключевого момента звонка"}`;
-  const resTxt = result==='ok' ? 'Оператор поставил этому звонку статус ПОДТВЕРЖДЕНИЕ (заказ подтверждён). Проверь, правильно ли это по правилам.\n' : result==='no' ? 'Оператор поставил этому звонку статус ОТКАЗ. Проверь, правильно ли это по правилам (не должен ли быть Дубль, Перезвон и т.п.) и не слил ли оператор заказ.\n' : '';
-  const dlg = dialogText(turns, {O:'Оператор', C:'Клиент'});
+  const rep = await chatJSON(sysCore, src, {max:3000});
+  // запрос 2: статусы, регламент и скрипт продукта (отдельно, чтобы каждый запрос влезал в бесплатный лимит)
   const prods = (line==='base' || line==='fiz') ? detectProducts(turns) : []; // эти скрипты только для второй линии (База и Физика)
-  const sysP = prods.length ? sys.replace('\nВерни JSON:', productBlock(prods) + '\nВерни JSON:').replace('"stages":[', '"product_check":{"product":"какой продукт обсуждали","presentation":"насколько презентация соответствует скрипту продукта (коротко)","used":["что из скрипта продукта оператор сказал (это плюс оператору)"],"missed":["что важное из скрипта продукта оператор пропустил"],"wrong":["что сказано неверно или запрещено в «NO DIGA»: цитата → как правильно по скрипту"]},\n"stages":[') : sys;
-  const rep = await chatJSON(sysP, ctx + resTxt + 'Разбери ВЕСЬ разговор от начала до конца, включая его конец.\n' + dlg);
-  // если модель что-то пропустила (бывает на длинных звонках) — дозапрашиваем недостающие блоки
+  status(lang==='es'?'Проверяю статус, регламент и продукт…':'Проверяю статус, регламент и скрипт продукта…', 92);
+  const sysCheck = `Ты — контролёр качества колл-центра. Проверь звонок на соблюдение регламента, правильность статуса${prods.length?' и знание продукта':''}.
+${head}
+${GLOBAL_RULES}
+${restText}
+${prods.length ? productBlock(prods) : ''}
+Верни JSON:
+{"status_audit":{"actual":"какой итог по факту (подтверждён / отказ / другое)","correct":"какой статус должен стоять по правилам (Подтверждён, Отказ, Дубль, Перезвон, Проблема связи, Автоответчик, Отложенная доставка и т.п.)","ok":true|false,"reason":"по каким фразам/признакам в разговоре это видно"},
+${L.checks?`"crm_status":"какой статус заказа, кнопку и Touchpoint нужно поставить по регламенту входящей линии и почему (одной строкой)",
+"checklist":[{"item":"пункт оценки звонка (${L.checks})","ok":true|false|null,"comment":"коротко; null — не применимо или не видно из разговора"}],`:''}
+${L.regs?`"crm_status":"какой статус по регламенту нужно поставить в CRM и почему (одной строкой)",
+"drain":"есть ли признаки СЛИВА заказа: «нет» или в чём слив",
+"trap_words":"какие слова-ловушки прозвучали (тогда невалид запрещён) или «нет»",
+"checklist":[{"item":"пункт регламента (представление по скрипту, без «удобно ли говорить», спокойный тон, потребности и презентация до цены, курсы по таблице, 2 отработки до минимального курса, данные заказа, полная стоимость, резюме заказа, сроки доставки, доп. продажа, оферта на выкуп)","ok":true|false|null,"comment":"коротко; null — не применимо"}],`:''}
+${prods.length?`"product_check":{"product":"какой продукт обсуждали","presentation":"насколько презентация соответствует скрипту продукта (коротко)","used":["что из скрипта продукта оператор сказал (это плюс оператору)"],"missed":["что важное из скрипта продукта оператор пропустил"],"wrong":["что сказано неверно или запрещено в «NO DIGA»: цитата → как правильно по скрипту"]},`:''}
+"extra_mistakes":[{"quote":"цитата оператора","problem":"нарушение регламента/правил статусов${prods.length?'/скрипта продукта':''}","better":"как правильно"}]}`;
+  try{
+    const chk = await chatJSON(sysCheck, src, {max:2500});
+    ['status_audit','crm_status','drain','trap_words','checklist','product_check'].forEach(k => { if(chk[k]!==undefined) rep[k] = chk[k]; });
+    const seen = new Set((rep.mistakes||[]).map(m => (m.quote||'').slice(0,40)));
+    (chk.extra_mistakes||[]).forEach(m => { if(m && m.problem && !seen.has((m.quote||'').slice(0,40))) (rep.mistakes = rep.mistakes||[]).push(m); });
+    if(rep.product_check && (rep.product_check.used||[]).length) rep.strengths = [...(rep.strengths||[]), ...rep.product_check.used.map(x => (lang==='es'?'Usó el guion del producto: ':'Говорил по скрипту продукта: ') + x)];
+  }catch(e){}
+  // если модель что-то пропустила — дозапрашиваем недостающие блоки
   const empty = k => !rep[k] || (Array.isArray(rep[k]) && !rep[k].length);
   const miss = ['strengths','mistakes','recommendations','script','summary'].filter(empty);
   if(miss.length){
-    status(lang==='es'?'Дописываю рекомендации на испанском…':'Дописываю рекомендации…', 90);
+    status(lang==='es'?'Дописываю рекомендации на испанском…':'Дописываю рекомендации…', 95);
     try{
-      const add = await chatJSON(`Ты — тренер по продажам. Пиши строго на языке: ${t.lang}; готовые фразы для оператора — на языке звонка. ${rulesBlock()}
-ЛИНИЯ: ${L.rules}
-По всему разговору (от начала до конца) верни JSON только с полями: {"summary":"резюме звонка 3-4 предложения","strengths":["что оператор сделал хорошо, с цитатами"],"mistakes":[{"quote":"цитата оператора","problem":"в чём ошибка","better":"как сказать лучше"}],"recommendations":["минимум 4 конкретных совета оператору"],"script":"улучшенный вариант ключевого момента"}. Ни одно поле не оставляй пустым (если ошибок нет — так и напиши в recommendations).`, ctx + resTxt + dlg);
+      const add = await chatJSON(`Ты — тренер по продажам. ${head} ${rulesBlock()}
+ЛИНИЯ: ${stagesText}
+По всему разговору (от начала до конца) верни JSON только с полями: {"summary":"резюме звонка 3-4 предложения","strengths":["что оператор сделал хорошо, с цитатами"],"mistakes":[{"quote":"цитата оператора","problem":"в чём ошибка","better":"как сказать лучше"}],"recommendations":["минимум 4 конкретных совета оператору"],"script":"улучшенный вариант ключевого момента"}. Ни одно поле не оставляй пустым (если ошибок нет — так и напиши в recommendations).`, src, {max:2500});
       miss.forEach(k => { if(add[k] && (!Array.isArray(add[k]) || add[k].length)) rep[k] = add[k]; });
     }catch(e){}
   }
