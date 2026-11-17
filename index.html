@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v29</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v30</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -680,7 +680,7 @@ function renderTrainee(c){
 async function makeTrainee(){
   const op = opName(), calls = traineeCalls(op);
   if(!calls.length){ status('⚠️ У этого оператора пока нет разобранных звонков.', 0); return; }
-  const lang = LS.get('reportLang','es');
+  const lang = 'ru'; // резюме стажёра — сначала на русском, испанский по кнопке
   current = {id:Date.now(), operator:op, trainee:true, line:calls[0].line, name:`🎓 Резюме стажёра · ${calls.length} звонков`, date:new Date().toLocaleString('ru-RU'), calls, lang, report:null, reports:{}, turns:[]};
   try{ current.report = await traineeSummary(current, lang); status('Готово.',100); }catch(e){ current.report = {error:e.message}; status('⚠️ '+e.message,0); }
   current.reports[lang] = current.report; saveHistory(current); render(current); window.scrollTo({top:0,behavior:'smooth'});
@@ -716,6 +716,9 @@ function render(c){
   const lang = c.lang||'ru', t = T[lang];
   $('result').classList.remove('hidden');
   document.querySelectorAll('[data-lang]').forEach(x=>x.classList.toggle('on', x.dataset.lang===lang));
+  { const bes = document.querySelector('[data-lang=es]'), bru = document.querySelector('[data-lang=ru]');
+    if(c.trainee){ bru.textContent='🇷🇺 Русский'; bes.textContent='🇪🇸 Español (по желанию)'; bes.before(bru); }
+    else { bes.textContent='🇪🇸 Español'; bru.textContent='🇷🇺 Русский (по желанию)'; bru.before(bes); } }
   $('btnSwap').classList.toggle('hidden', !!(c.multi||c.trainee));
   document.querySelector('[data-tab=dialog]').textContent = (c.multi||c.trainee) ? 'Звонки' : 'Диалог';
   if(c.trainee) return renderTrainee(c);
