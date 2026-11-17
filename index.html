@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v25</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v26</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -144,7 +144,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
   </div>
 
   <div class="card hidden" id="historyCard">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><h2 id="historyTitle" style="margin:0">Звонки оператора</h2><button id="btnClearMine">🗑 Удалить звонки оператора</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><h2 id="historyTitle" style="margin:0">Звонки оператора</h2><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="primary" id="btnTrainee" title="Выжимка по всем продажам и отказам для группы супервайзеров">🎓 Резюме стажёра</button><button id="btnClearMine">🗑 Удалить звонки оператора</button></span></div>
     <div class="hist" id="history"></div>
   </div>
 
@@ -586,6 +586,54 @@ async function runMany(files){
   status(`Готово за ${Math.round((Date.now()-t0)/1000)} сек.${failed?` Не удалось разобрать: ${failed}.`:''}`, 100);
 }
 
+/* ---------- резюме стажёра для супервайзеров ---------- */
+function traineeCalls(op){
+  return LS.get('history',[]).filter(x => (x.operator||'Без имени')===op && !x.multi && !x.trainee && x.report && !x.report.error)
+    .slice(0, 20).map(x => ({id:x.id, name:x.name, result:x.result, line:x.line, report:x.report}));
+}
+async function traineeSummary(c, lang){
+  const t = T[lang||'es'];
+  status(lang==='es'?'Готовлю резюме стажёра на испанском…':'Готовлю резюме стажёра…', 60);
+  const brief = c.calls.map((x,i)=>{ const r = x.report; return {call:i+1, status_operator: x.result==='ok'?'подтверждение':x.result==='no'?'отказ':'не указан', line:(LINES[x.line]||{}).short, score:r.score, outcome:r.outcome, sale:r.sale, status_audit:r.status_audit, strengths:r.strengths, mistakes:(r.mistakes||[]).map(m=>m.problem||m), objections:(r.objections||[]).map(o=>({objection:o.objection, verdict:o.verdict})), product_used:r.product_check&&r.product_check.used, product_wrong:r.product_check&&r.product_check.wrong, stages:(r.stages||[]).map(s=>s.name+': '+s.score)}; });
+  const sys = `Ты — старший тренер по продажам колл-центра. По разборам звонков СТАЖЁРА (и продажи, и отказы) напиши короткое резюме для группы супервайзеров, которые решают, брать ли стажёра в работу.
+Пиши строго на языке: ${t.lang}, о стажёре в третьем лице, деловым доброжелательным тоном, без списков и без цитат номеров звонков.
+${rulesBlock()}
+Опирайся только на то, что есть в разборах; учитывай правила компании, этапы продаж, работу с возражениями, статусы и знание продукта (если стажёр хотя бы частично говорил по скрипту продукта — это плюс).
+Верни JSON:
+{"strengths":"ровно 6-7 предложений одним абзацем: что стажёр уже умеет делать хорошо",
+"to_learn":"ровно 3-4 предложения одним абзацем: что стажёру нужно доучить в первую очередь"}`;
+  return chatJSON(sys, `Стажёр: ${c.operator}\nЗвонков: ${c.calls.length}\n` + JSON.stringify(brief));
+}
+function traineeText(c){
+  const es = (c.lang||'es')==='es', r = c.report||{};
+  const ok = c.calls.filter(x=>x.result==='ok').length, no = c.calls.filter(x=>x.result==='no').length;
+  return [es?`RESUMEN DEL BECARIO: ${c.operator}`:`РЕЗЮМЕ СТАЖЁРА: ${c.operator}`,
+    es?`Llamadas analizadas: ${c.calls.length} (✅ ${ok} confirmados, ❌ ${no} rechazos)`:`Разобрано звонков: ${c.calls.length} (✅ ${ok} подтверждений, ❌ ${no} отказов)`,
+    '', es?'✅ Puntos fuertes:':'✅ Сильные стороны:', r.strengths||'', '', es?'📚 Qué debe reforzar:':'📚 Что нужно доучить:', r.to_learn||''].join('\n');
+}
+function renderTrainee(c){
+  const r = c.report||{}, es = (c.lang||'es')==='es';
+  $('tab-dialog').innerHTML = c.calls.map((x,i)=>`<div class="item">${x.result==='ok'?'✅':x.result==='no'?'❌':'•'} ${esc(x.name)} <span class="muted">${esc(x.report.score??'—')}/10</span></div>`).join('');
+  if(r.error){ $('tab-report').innerHTML = `<p class="bad">Не удалось сделать резюме: ${esc(r.error)}</p><button onclick="reanalyze()">Повторить</button>`; return; }
+  const ok = c.calls.filter(x=>x.result==='ok').length, no = c.calls.filter(x=>x.result==='no').length;
+  $('tab-report').innerHTML = `
+    <h2>🎓 ${es?'Resumen del becario':'Резюме стажёра'}: ${esc(c.operator)}</h2>
+    <p class="muted">${es?`Llamadas analizadas: ${c.calls.length} · ✅ ${ok} confirmados · ❌ ${no} rechazos`:`Разобрано звонков: ${c.calls.length} · ✅ ${ok} подтверждений · ❌ ${no} отказов`} · ${esc(c.date)}</p>
+    <h3>✅ ${es?'Puntos fuertes':'Сильные стороны'}</h3><div class="item">${esc(r.strengths||'—')}</div>
+    <h3>📚 ${es?'Qué debe reforzar':'Что нужно доучить'}</h3><div class="item">${esc(r.to_learn||'—')}</div>
+    <div class="actions"><button class="primary" id="btnCopyTrainee">📋 ${es?'Copiar resumen':'Скопировать резюме'}</button></div>`;
+  $('btnCopyTrainee').onclick = () => navigator.clipboard.writeText(traineeText(c)).then(()=>status(es?'Copiado.':'Скопировано. Можно вставлять в чат супервайзеров.',100));
+}
+async function makeTrainee(){
+  const op = opName(), calls = traineeCalls(op);
+  if(!calls.length){ status('⚠️ У этого оператора пока нет разобранных звонков.', 0); return; }
+  const lang = LS.get('reportLang','es');
+  current = {id:Date.now(), operator:op, trainee:true, line:calls[0].line, name:`🎓 Резюме стажёра · ${calls.length} звонков`, date:new Date().toLocaleString('ru-RU'), calls, lang, report:null, reports:{}, turns:[]};
+  try{ current.report = await traineeSummary(current, lang); status('Готово.',100); }catch(e){ current.report = {error:e.message}; status('⚠️ '+e.message,0); }
+  current.reports[lang] = current.report; saveHistory(current); render(current); window.scrollTo({top:0,behavior:'smooth'});
+}
+$('btnTrainee').onclick = makeTrainee;
+
 async function summarize(calls, lang, line){
   const t = T[lang||'ru']; const L = LINES[line||'ol'];
   status(lang==='es'?'Готовлю сводный отчёт на испанском…':'Готовлю сводный разбор по всем звонкам…', 92);
@@ -614,8 +662,9 @@ function render(c){
   const lang = c.lang||'ru', t = T[lang];
   $('result').classList.remove('hidden');
   document.querySelectorAll('[data-lang]').forEach(x=>x.classList.toggle('on', x.dataset.lang===lang));
-  $('btnSwap').classList.toggle('hidden', !!c.multi);
-  document.querySelector('[data-tab=dialog]').textContent = c.multi ? 'Звонки' : 'Диалог';
+  $('btnSwap').classList.toggle('hidden', !!(c.multi||c.trainee));
+  document.querySelector('[data-tab=dialog]').textContent = (c.multi||c.trainee) ? 'Звонки' : 'Диалог';
+  if(c.trainee) return renderTrainee(c);
   if(c.multi) return renderSummary(c);
   $('tab-dialog').innerHTML = `<p class="muted">${esc(c.name)} · ${esc(c.date)}${c.language?' · '+esc(c.language):''}</p>` +
     c.turns.map(x=>`<div class="turn ${x.r==='O'?'op':'cl'}"><div class="who">${x.r==='O'?t.O:t.C}<small>${fmt(x.start)}</small></div><div class="msg">${esc(x.t)}</div></div>`).join('');
@@ -677,13 +726,14 @@ document.querySelectorAll('.tabs button[data-tab]').forEach(b => b.onclick = () 
 async function reanalyze(){
   if(!current) return;
   const lang = current.lang||'ru'; current.reports = current.reports||{};
-  try{ current.report = current.multi ? await summarize(current.calls, lang, lineOf(current)) : await analyze(current.turns, current.language, lang, lineOf(current), current.result); status('Готово.',100); }
+  try{ current.report = current.trainee ? await traineeSummary(current, lang) : current.multi ? await summarize(current.calls, lang, lineOf(current)) : await analyze(current.turns, current.language, lang, lineOf(current), current.result); status('Готово.',100); }
   catch(e){ current.report = {error:e.message}; }
   current.reports[lang] = current.report;
   saveHistory(current); render(current);
 }
 $('btnRedo').onclick = async () => {
   if(!current) return;
+  if(current.trainee){ current.calls = traineeCalls(current.operator); current.name = `🎓 Резюме стажёра · ${current.calls.length} звонков`; current.reports = {}; return reanalyze(); }
   if(current.multi){
     const h = LS.get('history',[]); const lang = current.lang||'ru';
     for(let i=0;i<current.calls.length;i++){
@@ -706,6 +756,7 @@ $('btnSwap').onclick = async () => {
 };
 
 function plainText(c){
+  if(c.trainee) return traineeText(c);
   if(c.multi){
     const r = c.report||{}, t = T[c.lang||'ru'], L = [`${t.sum.toUpperCase()} (${c.calls.length} ${t.calls}, ${c.date})`, ''];
     if(r.error) return L.join('\n');
@@ -753,7 +804,7 @@ function saveHistory(c){
   renderHistory();
 }
 function histRow(x){
-  return `<div class="row-wrap"><a data-id="${x.id}"><span>${x.multi?'📊 ':''}${RES[x.result]?(x.result==='ok'?'✅ ':'❌ '):''}${esc(x.name)}</span><span class="muted">${esc(x.report&&x.report.score!=null?x.report.score+'/10 · ':'')}${esc(x.date)}</span></a><button class="del" data-del="${x.id}" title="Удалить">✕</button></div>`;
+  return `<div class="row-wrap"><a data-id="${x.id}"><span>${x.multi&&!x.trainee?'📊 ':''}${RES[x.result]?(x.result==='ok'?'✅ ':'❌ '):''}${esc(x.name)}</span><span class="muted">${esc(x.report&&x.report.score!=null?x.report.score+'/10 · ':'')}${esc(x.date)}</span></a><button class="del" data-del="${x.id}" title="Удалить">✕</button></div>`;
 }
 function removeWhere(fn, question){
   const h = LS.get('history',[]); const n = h.filter(fn).length;
