@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import '../logic/daily.dart';
 import '../logic/tarot.dart';
 import '../main.dart';
+import '../logic/share_content.dart';
 import '../theme.dart';
+import '../widgets/share_card.dart';
 
 /// Расклады Таро: карта дня и «Прошлое, настоящее, будущее» на старших арканах.
 class TarotScreen extends StatefulWidget {
@@ -103,6 +105,7 @@ class _TarotScreenState extends State<TarotScreen> {
                 'Карта одна на весь день. Завтра будет новая.',
                 style: TextStyle(color: AW.soft, fontSize: 12.5),
               ),
+              ShareButton(content: () => shareCardOfDay(c, DateTime.now())),
             ],
           ),
         ),
@@ -183,6 +186,7 @@ class _TarotScreenState extends State<TarotScreen> {
                 'На тот же вопрос карты всегда отвечают одинаково. Вопрос про сегодня получит новый ответ завтра.',
                 style: TextStyle(color: AW.soft, fontSize: 12.5),
               ),
+              ShareButton(content: () => shareSpread(s)),
             ],
           ),
         ),
