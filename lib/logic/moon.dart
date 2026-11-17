@@ -47,3 +47,7 @@ MoonInfo moonFor(DateTime date) {
   }
   return MoonInfo(age, illumination, phase, age.floor() + 1);
 }
+
+/// Фаза Луны «на этот день» — по началу суток. Её берут прогноз дня и уведомления,
+/// поэтому прогноз не меняется в течение дня, даже если Луна сменила фазу днём.
+MoonPhase phaseOfDay(DateTime d) => moonFor(DateTime(d.year, d.month, d.day)).phase;
