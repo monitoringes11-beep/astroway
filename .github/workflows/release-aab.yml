@@ -95,11 +95,25 @@ jobs:
             AstroWay-${{ github.run_number }}.aab
             AstroWay-${{ github.run_number }}.apk
 
+      # Промежуточная сборка из pull request: подписана временным ключом, в Play не загружать.
+      # Её забирают, чтобы переподписать настоящим ключом вне GitHub.
+      - name: Выложить промежуточную сборку (pull request)
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete pr-check-build --yes --cleanup-tag || true
+          gh release create pr-check-build AstroWay-${{ github.run_number }}.aab AstroWay-${{ github.run_number }}.apk \
+            --prerelease --target "${{ github.event.pull_request.head.sha }}" \
+            --title "Промежуточная сборка (не загружать в Play)" \
+            --notes "Подписана временным ключом для проверки. Номер сборки: ${{ github.run_number }}."
+
       - name: Выложить в Releases
         if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          gh release delete pr-check-build --yes --cleanup-tag || true
           gh release delete play-build --yes --cleanup-tag || true
           gh release create play-build AstroWay-${{ github.run_number }}.aab AstroWay-${{ github.run_number }}.apk \
             --prerelease \
