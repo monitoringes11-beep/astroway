@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v30</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v31</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -688,12 +688,44 @@ async function makeTrainee(){
 $('btnTrainee').onclick = makeTrainee;
 $('btnTrainee2').onclick = () => { if(current && current.operator){ $('operator').value = current.operator; LS.set('operator', current.operator); } makeTrainee(); };
 
+const clip = (x, n) => { x = typeof x==='string' ? x : JSON.stringify(x||''); return x.length > n ? x.slice(0, n) + '…' : x; };
+function callBrief(c, i){
+  const r = c.report || {};
+  return {call:i+1, score:r.score, outcome:clip(r.outcome,160), sale:clip(r.sale,120),
+    status:r.status_audit ? clip(`${r.status_audit.actual||''} → ${r.status_audit.correct||''}${r.status_audit.ok===false?' (ОШИБКА)':''}`,160) : undefined,
+    drain:r.drain && !/^(нет|no)\b/i.test(r.drain) ? clip(r.drain,150) : undefined,
+    regulation_fails:(r.checklist||[]).filter(x=>x.ok===false).map(x=>clip(x.item,70)).slice(0,6),
+    weak_stages:(r.stages||[]).filter(x=>(+x.score||10)<=5).map(x=>clip(x.name,50)+' '+x.score),
+    strengths:(r.strengths||[]).slice(0,3).map(x=>clip(x,140)),
+    mistakes:(r.mistakes||[]).slice(0,5).map(m=>clip(m.problem||m,160)),
+    objections:(r.objections||[]).slice(0,4).map(o=>clip(o.objection,80)+' — '+(o.verdict||'')),
+    product:r.product_check ? clip((r.product_check.wrong||[]).concat(r.product_check.missed||[]).join('; '),200) : undefined};
+}
+const GROUP_PROMPT = `Ты помогаешь тренеру по продажам. Тебе дают краткие выжимки разборов группы звонков одного оператора. Сожми их в конспект для итогового сводного разбора: повторяющиеся ошибки (с номерами звонков), сильные стороны, возражения и как часто встречались, слабые этапы, ошибки статусов, продажи и суммы. Ничего не выдумывай.
+Верни JSON: {"notes":"конспект"}`;
 async function summarize(calls, lang, line){
   const t = T[lang||'ru']; const L = LINES[line||'ol'];
-  status(lang==='es'?'Готовлю сводный отчёт на испанском…':'Готовлю сводный разбор по всем звонкам…', 92);
-  const brief = calls.map((c,i)=>({call:i+1, name:c.name, score:c.report.score, outcome:c.report.outcome, sale:c.report.sale, crm_status:c.report.crm_status, status_audit:c.report.status_audit, product_check:c.report.product_check, drain:c.report.drain, regulation_fails:(c.report.checklist||[]).filter(x=>x.ok===false).map(x=>x.item), stages:c.report.stages, strengths:c.report.strengths, mistakes:c.report.mistakes, objections:c.report.objections, recommendations:c.report.recommendations}));
-  const sys = `Ты — опытный тренер по продажам. Ниже разборы нескольких звонков ОДНОГО оператора. Сделай сводный разбор: найди закономерности, повторяющиеся ошибки и сильные стороны, а не пересказывай каждый звонок.
-ЛИНИЯ И ЭТАПЫ ПРОДАЖ: ${L.rules}
+  status(lang==='es'?'Готовлю сводный отчёт на испанском…':'Готовлю сводный разбор по всем звонкам…', 90);
+  const briefs = calls.map(callBrief);
+  let input = JSON.stringify(briefs);
+  // много звонков: сначала сжимаем по группам, чтобы запрос влез в бесплатный лимит
+  if(input.length > 9000){
+    const groups = []; let cur = [];
+    briefs.forEach(x => { if(cur.length && JSON.stringify(cur.concat([x])).length > 8000){ groups.push(cur); cur = []; } cur.push(x); });
+    if(cur.length) groups.push(cur);
+    const notes = [];
+    for(let g=0; g<groups.length; g++){
+      status(`Сводный разбор: сжимаю звонки (часть ${g+1} из ${groups.length})…`, 90 + 6*g/groups.length);
+      const nums = groups[g].map(x=>x.call);
+      try{ const r = await chatJSON(GROUP_PROMPT, JSON.stringify(groups[g]), {small:true, max:1500}); notes.push(`Звонки ${nums[0]}–${nums[nums.length-1]}:\n${r.notes||''}`); }
+      catch(e){ notes.push(`Звонки ${nums[0]}–${nums[nums.length-1]}:\n` + groups[g].map(x=>`#${x.call} ${x.score}/10 ${x.outcome}; ошибки: ${x.mistakes.join('; ')}`).join('\n').slice(0,2500)); }
+    }
+    input = `Всего звонков: ${calls.length}. Конспекты по группам звонков:\n` + notes.join('\n\n');
+    if(input.length > 12000) input = input.slice(0, 12000);
+  }
+  status(lang==='es'?'Готовлю сводный отчёт на испанском…':'Готовлю сводный разбор по всем звонкам…', 97);
+  const sys = `Ты — опытный тренер по продажам. Ниже краткие выжимки разборов нескольких звонков ОДНОГО оператора (или конспекты групп звонков). Сделай сводный разбор: найди закономерности, повторяющиеся ошибки и сильные стороны, а не пересказывай каждый звонок.
+ЛИНИЯ И ЭТАПЫ ПРОДАЖ: ${L.rules.split('\n')[0]}
 Отдельно оцени, на каких этапах оператор стабильно проседает, и как его продажи соотносятся с нормой чека группы.
 ${rulesBlock()}
 ВЕСЬ отчёт пиши строго на языке: ${t.lang}. Готовые фразы для оператора ("phrase", "best_response") — на языке звонков.${lang==='es'?' Обращайся к оператору на «tú», доброжелательно.':''}
@@ -706,9 +738,11 @@ ${rulesBlock()}
 "status_errors":["звонки, где статус поставлен неверно (например, должен был быть Дубль или Перезвон): номер звонка — что стоит — что должно быть — почему"],
 "check_summary":"продажи оператора относительно нормы чека группы (если применимо)",
 "priorities":["3 главных приоритета на неделю"],
-"training_plan":["конкретные упражнения для тренировки"],
-"per_call":[{"call":номер,"score":1-10,"summary":"резюме звонка в 2-3 предложениях: суть разговора и чем закончился","one_line":"главный вывод для оператора по этому звонку"}]}`;
-  return chatJSON(sys, JSON.stringify(brief));
+"training_plan":["конкретные упражнения для тренировки"]}`;
+  const rep = await chatJSON(sys, input, {max:3000});
+  // резюме каждого звонка берём из уже готовых разборов — так ответ модели короткий и не обрывается
+  rep.per_call = calls.map((c,i)=>{ const r = c.report||{}; return {call:i+1, score:r.score, summary:r.summary||r.outcome||'', one_line:(r.recommendations||[])[0]||''}; });
+  return rep;
 }
 
 /* ---------- render ---------- */
