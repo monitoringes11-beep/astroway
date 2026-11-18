@@ -17,6 +17,7 @@ import 'package:astroway/logic/zodiac.dart';
 import 'package:astroway/screens/home.dart';
 
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:astroway/main.dart';
 import 'package:astroway/screens/horoscope.dart';
@@ -28,6 +29,9 @@ import 'package:astroway/screens/feedback.dart';
 import 'package:astroway/screens/palm.dart';
 import 'package:astroway/screens/profiles.dart';
 import 'package:astroway/screens/tarot.dart';
+import 'package:astroway/screens/dream.dart';
+import 'package:astroway/logic/share_content.dart';
+import 'package:astroway/widgets/share_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -143,6 +147,11 @@ void main() {
     expect(horoscopeFor(10, d).general, horoscopeFor(10, e).general);
     expect(horoscopeFor(10, d, easy: true).general, contains(RegExp(r'[^\x00-\u04ff]')));
     expect(horoscopeFor(10, d, week: true).week, hasLength(3));
+    final daily = dailyHoroscope(10, d);
+    expect(daily.map((b) => b.$1), ['Общий настрой', 'Общение', 'Дела и финансы', 'Итог дня']);
+    expect(daily.first.$2, contains('Скорпионам'));
+    expect(daily.map((b) => b.$2).join(), isNot(contains('{')));
+    expect(dailyHoroscope(10, e).map((b) => b.$2).join(), daily.map((b) => b.$2).join());
     expect(horoscopeFor(10, d).numbers.every((n) => n >= 1 && n <= 40), isTrue);
   });
 
@@ -395,6 +404,7 @@ void main() {
     expect(await FeedbackSender.send({'Отзыв': 'второй'}), isTrue);
     expect(await FeedbackSender.queued(), 0);
     expect(sent.map((m) => m['Отзыв']), ['Нет слова вокзал', 'второй']);
+    expect(FeedbackSender.messageText(f), contains('Раздел: Сонник'));
   });
 
   testWidgets('экран обратной связи', (tester) async {
@@ -407,6 +417,90 @@ void main() {
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.byType(FilledButton), 200, scrollable: find.byType(Scrollable).first);
     expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('«Поделиться»: без личных данных', () async {
+    final d = DateTime(2026, 11, 17, 9);
+    SharedPreferences.setMockInitialValues({});
+    final mem = WitchMemory(await SharedPreferences.getInstance());
+    await mem.add(WitchAnswer(d, ['Змея'], 'секрет про начальника', 'dream'));
+    final dream = interpretDream('мне снилась змея и Анна', anna, d, mem);
+    expect(dream.memoryLine, contains('секрет'));
+    final texts = <String>[
+      shareForecast(
+        forecastFor(anna, d, easy: false, recall: WitchAnswer(d, ['змея'], 'секрет про начальника', 'dream')),
+        signOf(anna.birthday),
+        d,
+      ).plainText,
+      shareDream(dream).plainText,
+      shareCardOfDay(cardOfDay('Анна', d), d).plainText,
+      shareSpread(spreadFor('Анна', 'Выйду ли я замуж за Петю?', d)).plainText,
+      sharePalm({for (final l in palmLines) l.id: l.variants.first.id}, easy: true).plainText,
+    ];
+    for (final t in texts) {
+      expect(t, isNot(contains('Анна')));
+      expect(t, isNot(contains('1990')));
+      expect(t, isNot(contains('5 ноября')));
+      expect(t, isNot(contains('секрет')));
+      expect(t, isNot(contains('Петю')));
+      expect(t, contains('AstroWay'));
+    }
+    expect(texts[0], contains('Скорпион · 17 ноября'));
+    expect(texts[1], contains('Змея'));
+    expect(texts[4].split('\n\n').length, greaterThan(6));
+    expect(shorten('а' * 300).length, lessThanOrEqualTo(241));
+  });
+
+  testWidgets('«Поделиться»: предпросмотр и отправка картинки', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppState(Store(await SharedPreferences.getInstance()));
+    await app.store.saveProfile(anna);
+    Uint8List? png;
+    String? text;
+    ShareService.sender = (p, t) async {
+      png = p;
+      text = t;
+    };
+    await tester.pumpWidget(MaterialApp(home: TarotScreen(app: app)));
+    await tester.tap(find.byType(TarotCard));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Поделиться'), 150, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('Поделиться'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ShareCard), findsOneWidget);
+    expect(find.text('Так увидят твои друзья'), findsOneWidget);
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Отправить'));
+      for (var i = 0; i < 50 && png == null; i++) {
+        await Future.delayed(const Duration(milliseconds: 50));
+        await tester.pump();
+      }
+    });
+    await tester.pumpAndSettle();
+    expect(png, isNotNull);
+    expect(png!.sublist(1, 4), [0x50, 0x4E, 0x47]); // PNG
+    expect(text, contains('Карта дня'));
+    expect(text, isNot(contains('Анна')));
+    expect(find.byType(ShareCard), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('«Поделиться» на главном и в соннике', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppState(Store(await SharedPreferences.getInstance()));
+    await app.store.saveProfile(anna);
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(app: app)));
+    await tester.scrollUntilVisible(find.text('Поделиться'), 200, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Поделиться'), findsOneWidget);
+    await tester.pumpWidget(MaterialApp(home: DreamScreen(app: app)));
+    await tester.tap(find.text('✎ Написать'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'змея');
+    await tester.tap(find.text('Толковать сон'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Поделиться'), 200, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Поделиться'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

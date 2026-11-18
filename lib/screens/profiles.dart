@@ -5,6 +5,7 @@ import '../logic/profile.dart';
 import '../logic/zodiac.dart';
 import '../main.dart';
 import '../theme.dart';
+import 'notifications.dart';
 import 'onboarding.dart';
 
 /// Вход: выбор профиля на этом телефоне. У каждого свой прогноз и своя память волшебницы.
@@ -169,6 +170,8 @@ class ProfileMenu extends StatelessWidget {
           case 'nopin':
             await app.setPin(e.id, null);
             if (context.mounted) _toast(context, 'Код входа убран');
+          case 'notify':
+            await Navigator.of(context).push(MaterialPageRoute(builder: (_) => NotificationsScreen(app: app)));
           case 'logout':
             await app.logout();
         }
@@ -177,6 +180,7 @@ class ProfileMenu extends StatelessWidget {
         PopupMenuItem(enabled: false, child: Text(e?.profile.name ?? '')),
         PopupMenuItem(value: 'pin', child: Text(e?.pinHash == null ? 'Поставить код входа' : 'Сменить код входа')),
         if (e?.pinHash != null) const PopupMenuItem(value: 'nopin', child: Text('Убрать код входа')),
+        const PopupMenuItem(value: 'notify', child: Text('Уведомления')),
         const PopupMenuItem(value: 'logout', child: Text('Выйти и сменить профиль')),
       ],
     );

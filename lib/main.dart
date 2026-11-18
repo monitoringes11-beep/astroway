@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'logic/feedback_sender.dart';
 import 'logic/memory.dart';
+import 'logic/notifier.dart';
 import 'logic/profile.dart';
 import 'screens/home.dart';
 import 'screens/onboarding.dart';
@@ -16,6 +17,7 @@ Future<void> main() async {
   await DreamBase.loadAsset();
   final store = await Store.open();
   FeedbackSender.flushQueue(); // неотправленные отзывы уходят в фоне
+  Notifier.refresh(prefs: store.prefs, entry: store.active, easy: store.easyTone); // план уведомлений на месяц вперёд
   runApp(AstroWayApp(store: store));
 }
 
@@ -30,30 +32,39 @@ class AppState extends ChangeNotifier {
   /// Память волшебницы активного профиля.
   WitchMemory get memory => WitchMemory(store.prefs, Store.memoryKeyFor(store.activeId ?? Store.legacyId));
 
+  /// Уведомления пересобираются при каждой смене профиля, кода или тона.
+  Future<void> refreshNotices() => Notifier.refresh(prefs: store.prefs, entry: store.active, easy: store.easyTone);
+
   Future<void> addProfile(Profile p) async {
     await store.addProfile(p);
     await store.setLargeFont(p.ageOn(DateTime.now()) >= 50);
+    Notifier.askOnce(store.prefs);
+    refreshNotices();
     notifyListeners();
   }
 
   Future<void> login(ProfileEntry e) async {
     await store.login(e.id);
     await store.setLargeFont(e.profile.ageOn(DateTime.now()) >= 50);
+    refreshNotices();
     notifyListeners();
   }
 
   Future<void> logout() async {
     await store.logout();
+    refreshNotices();
     notifyListeners();
   }
 
   Future<void> deleteProfile(String id) async {
     await store.deleteProfile(id);
+    refreshNotices();
     notifyListeners();
   }
 
   Future<void> setPin(String id, String? pin) async {
     await store.setPin(id, pin);
+    refreshNotices();
     notifyListeners();
   }
 
@@ -69,11 +80,14 @@ class AppState extends ChangeNotifier {
   Future<void> saveProfile(Profile p) async {
     await store.saveProfile(p);
     await store.setLargeFont(p.ageOn(DateTime.now()) >= 50);
+    Notifier.askOnce(store.prefs);
+    refreshNotices();
     notifyListeners();
   }
 
   Future<void> setEasy(bool v) async {
     await store.setEasyTone(v);
+    refreshNotices();
     notifyListeners();
   }
 
@@ -90,8 +104,29 @@ class AstroWayApp extends StatefulWidget {
   State<AstroWayApp> createState() => _AstroWayAppState();
 }
 
-class _AstroWayAppState extends State<AstroWayApp> {
+class _AstroWayAppState extends State<AstroWayApp> with WidgetsBindingObserver {
   late final AppState app = AppState(widget.store);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (app.profile != null) Notifier.askOnce(app.store.prefs);
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Вернулись в приложение — продлеваем план уведомлений.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) app.refreshNotices();
+  }
 
   @override
   Widget build(BuildContext context) {

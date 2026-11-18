@@ -147,11 +147,22 @@ class _HoroscopeScreenState extends State<HoroscopeScreen> {
             ],
           ),
           const SizedBox(height: 10),
-          Text(h.general, style: const TextStyle(height: 1.4)),
-          const Divider(height: 24),
-          _sphere('💞', 'Любовь', h.love),
-          _sphere('💰', 'Деньги и карьера', h.money),
-          _sphere('🌿', 'Здоровье и энергия', h.health),
+          if (week) ...[
+            Text(h.general, style: const TextStyle(height: 1.4)),
+            const Divider(height: 24),
+            _sphere('💞', 'Любовь', h.love),
+            _sphere('💰', 'Деньги и карьера', h.money),
+            _sphere('🌿', 'Здоровье и энергия', h.health),
+          ] else
+            for (final (title, text) in dailyHoroscope(_sign, now, easy: widget.app.easy)) ...[
+              Text(
+                '• $title:',
+                style: const TextStyle(fontWeight: FontWeight.w700, color: AW.gold, fontSize: 16),
+              ),
+              const SizedBox(height: 4),
+              Text(text, style: const TextStyle(height: 1.45)),
+              const SizedBox(height: 14),
+            ],
           if (h.week != null) ...[
             Text(h.week!.join(' · '), style: const TextStyle(color: AW.soft, height: 1.4)),
             const SizedBox(height: 10),

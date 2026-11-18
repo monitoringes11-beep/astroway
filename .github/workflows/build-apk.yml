@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: build-apk
-  cancel-in-progress: true
+  cancel-in-progress: false # сборки идут по очереди, а не отменяют друг друга
 
 jobs:
   apk:
@@ -32,7 +32,7 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
-      - run: flutter build apk --release
+      - run: flutter build apk --release --dart-define=TG_TOKEN=${{ secrets.TG_TOKEN }} --dart-define=TG_CHAT=${{ secrets.TG_CHAT }}
 
       - name: Переименовать файл
         run: cp build/app/outputs/flutter-apk/app-release.apk AstroWay-test.apk

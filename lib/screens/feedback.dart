@@ -91,11 +91,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          ok
-              ? 'Спасибо! Отзыв отправлен.'
-              : 'Сейчас нет связи. Отзыв сохранён и отправится сам, когда появится интернет.',
-        ),
+        content: Text(ok ? 'Спасибо! Отзыв отправлен.' : 'Спасибо! Отзыв сохранён и отправится сам чуть позже.'),
       ),
     );
   }
