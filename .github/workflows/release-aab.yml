@@ -68,7 +68,10 @@ jobs:
       - run: flutter test
 
       # Номер сборки (versionCode) растёт с каждым запуском: Google Play требует новый номер на каждую загрузку.
-      - run: flutter build appbundle --release --build-number=${{ github.run_number }}
+      - run: flutter build appbundle --release --build-number=${{ github.run_number }} --dart-define=TG_TOKEN=${{ secrets.TG_TOKEN }} --dart-define=TG_CHAT=${{ secrets.TG_CHAT }}
+
+      # APK той же версии для установки на телефон в обход магазина.
+      - run: flutter build apk --release --build-number=${{ github.run_number }} --dart-define=TG_TOKEN=${{ secrets.TG_TOKEN }} --dart-define=TG_CHAT=${{ secrets.TG_CHAT }}
 
       - name: Проверить подпись
         run: |
@@ -81,12 +84,16 @@ jobs:
         run: rm -f android/app/upload-keystore.jks android/key.properties
 
       - name: Переименовать файл
-        run: cp build/app/outputs/bundle/release/app-release.aab AstroWay-${{ github.run_number }}.aab
+        run: |
+          cp build/app/outputs/bundle/release/app-release.aab AstroWay-${{ github.run_number }}.aab
+          cp build/app/outputs/flutter-apk/app-release.apk AstroWay-${{ github.run_number }}.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event_name == 'pull_request' && 'AstroWay-check-NE-ZAGRUZHAT' || 'AstroWay-GooglePlay' }}
-          path: AstroWay-${{ github.run_number }}.aab
+          path: |
+            AstroWay-${{ github.run_number }}.aab
+            AstroWay-${{ github.run_number }}.apk
 
       - name: Выложить в Releases
         if: github.event_name != 'pull_request'
@@ -94,7 +101,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete play-build --yes --cleanup-tag || true
-          gh release create play-build AstroWay-${{ github.run_number }}.aab \
+          gh release create play-build AstroWay-${{ github.run_number }}.aab AstroWay-${{ github.run_number }}.apk \
             --prerelease \
             --title "Сборка для Google Play" \
             --notes "Подписанный AAB для загрузки в Play Console. Номер сборки: ${{ github.run_number }}. Коммит: ${GITHUB_SHA::7}."
