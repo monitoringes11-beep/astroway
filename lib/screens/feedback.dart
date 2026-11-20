@@ -5,7 +5,7 @@ import '../logic/feedback_sender.dart';
 import '../main.dart';
 import '../theme.dart';
 
-const feedbackKinds = ['💛 Нравится', '😕 Не нравится', '✨ Не хватает', '🐞 Ошибка'];
+const feedbackKinds = ['Нравится', 'Не нравится', 'Не хватает', 'Ошибка'];
 const feedbackSections = [
   'Главный экран',
   'Прогноз дня',
@@ -19,7 +19,14 @@ const feedbackSections = [
   'Профили и вход',
   'Другое',
 ];
-const feedbackMoods = ['😍', '🙂', '😐', '🙁'];
+/// Оценка: слово уходит в отзыв, иконка только на экране.
+const feedbackMoods = ['Отлично', 'Хорошо', 'Так себе', 'Плохо'];
+const _moodIcons = [
+  Icons.sentiment_very_satisfied_outlined,
+  Icons.sentiment_satisfied_outlined,
+  Icons.sentiment_neutral_outlined,
+  Icons.sentiment_dissatisfied_outlined,
+];
 
 /// Поля письма. Имя и дата рождения не отправляются, только то, что человек выбрал и написал.
 Map<String, String> feedbackFields({
@@ -91,7 +98,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'Спасибо! Отзыв отправлен.' : 'Спасибо! Отзыв сохранён и отправится сам чуть позже.'),
+        content: Text(ok ? 'Спасибо, отзыв отправлен' : 'Спасибо. Отзыв сохранён и отправится сам, когда появится сеть'),
       ),
     );
   }
@@ -118,33 +125,33 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
           const Text(
-            'Расскажи, что нравится, чего не хватает и что мешает. Мы читаем каждый отзыв и по ним дополняем приложение.',
+            'Расскажите, что нравится, чего не хватает и что мешает. Мы читаем каждый отзыв и по ним дополняем приложение.',
             style: TextStyle(height: 1.4),
           ),
           const SizedBox(height: 16),
-          const Label('Как тебе AstroWay?'),
-          const SizedBox(height: 6),
-          Row(
+          const Label('Как вам AstroWay?'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              for (final m in feedbackMoods)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(m, style: const TextStyle(fontSize: 24)),
-                    selected: _mood == m,
-                    showCheckmark: false,
-                    onSelected: (v) => setState(() => _mood = v ? m : null),
-                  ),
+              for (var i = 0; i < feedbackMoods.length; i++)
+                ChoiceChip(
+                  avatar: Icon(_moodIcons[i], size: 18),
+                  label: Text(feedbackMoods[i]),
+                  selected: _mood == feedbackMoods[i],
+                  showCheckmark: false,
+                  onSelected: (v) => setState(() => _mood = v ? feedbackMoods[i] : null),
                 ),
             ],
           ),
           const SizedBox(height: 16),
           const Label('О чём отзыв'),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           _chips(feedbackKinds, _kinds),
           const SizedBox(height: 16),
           const Label('Какой раздел'),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           _chips(feedbackSections, _sections),
           const SizedBox(height: 16),
           TextField(
@@ -181,10 +188,10 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
             onPressed: _ready && !_sending ? _send : null,
             child: Text(_sending ? 'Отправляю…' : 'Отправить отзыв'),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           const Text(
             'Отзыв уйдёт прямо из приложения. Имя и дата рождения не отправляются.',
-            style: TextStyle(color: AW.soft, fontSize: 12.5),
+            style: TextStyle(color: AW.soft, fontSize: 13),
           ),
         ],
       ),

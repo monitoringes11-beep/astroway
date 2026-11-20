@@ -51,16 +51,16 @@ class _OmensScreenState extends State<OmensScreen> {
       },
       onError: (e) => setState(() {
         _listening = false;
-        _voiceHint = 'Не получилось распознать. Попробуй ещё раз или напиши текстом.';
+        _voiceHint = 'Не получилось распознать. Попробуйте ещё раз или напишите текстом.';
       }),
     );
     if (!ok) {
-      setState(() => _voiceHint = 'Нет доступа к микрофону. Разреши его в настройках или напиши текстом.');
+      setState(() => _voiceHint = 'Нет доступа к микрофону. Разрешите его в настройках или напишите текстом.');
       return;
     }
     setState(() {
       _listening = true;
-      _voiceHint = 'Слушаю… Расскажи, что случилось';
+      _voiceHint = 'Слушаю… Расскажите, что случилось';
     });
     await _speech.listen(
       listenOptions: SpeechListenOptions(
@@ -113,11 +113,11 @@ class _OmensScreenState extends State<OmensScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Label('Задание на сегодня'),
-            const SizedBox(height: 6),
-            Text(t[0], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
+            Text(t[0], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 8),
             Text(t[1], style: const TextStyle(color: AW.soft)),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
@@ -126,7 +126,7 @@ class _OmensScreenState extends State<OmensScreen> {
                     child: Text(_male ? 'Встретил знак' : 'Встретила знак'),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
@@ -139,7 +139,7 @@ class _OmensScreenState extends State<OmensScreen> {
           ],
         ),
       ),
-      const SizedBox(height: 14),
+      const SizedBox(height: 16),
       if (_met == true) _OmenCard(omen: omens.firstWhere((o) => o.id == t[2]), app: widget.app),
       if (_met == false)
         const GlassCard(
@@ -148,9 +148,9 @@ class _OmensScreenState extends State<OmensScreen> {
             children: [
               Text(
                 'Знак не встретился',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AW.gold),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AW.gold),
               ),
-              SizedBox(height: 6),
+              SizedBox(height: 8),
               Text(
                 'Это тоже ответ: сегодня день без подсказок, а значит, решения в ваших руках. '
                 'Завтра будет новое задание.',
@@ -185,24 +185,24 @@ class _OmensScreenState extends State<OmensScreen> {
       ),
       if (_voiceHint != null)
         Padding(
-          padding: const EdgeInsets.only(top: 6),
+          padding: const EdgeInsets.only(top: 8),
           child: Text(_voiceHint!, style: const TextStyle(color: AW.soft, fontSize: 13)),
         ),
-      const SizedBox(height: 10),
+      const SizedBox(height: 12),
       _chips(
-        {'': 'Все', 'good': '☀ Добрые', 'warning': '⚠ Предупреждение', 'neutral': '◯ Нейтральные'},
+        {'': 'Все', 'good': 'Добрые', 'warning': 'Предупреждения', 'neutral': 'Нейтральные'},
         _polarity,
         (v) => _polarity = v,
       ),
-      const SizedBox(height: 6),
+      const SizedBox(height: 8),
       _chips(
         {
           '': 'Все сферы',
-          'love': '💞 Любовь',
-          'money': '💰 Деньги',
-          'road': '🛤 Дорога',
-          'home': '🏠 Дом',
-          'decision': '🧭 Решения',
+          'love': 'Любовь',
+          'money': 'Деньги',
+          'road': 'Дорога',
+          'home': 'Дом',
+          'decision': 'Решения',
         },
         _sphere,
         (v) => _sphere = v,
@@ -210,7 +210,7 @@ class _OmensScreenState extends State<OmensScreen> {
       const SizedBox(height: 12),
       if (res.isEmpty)
         const Text(
-          'Такого знака пока нет в словаре. Попробуй описать другими словами.',
+          'Такого знака пока нет в словаре. Попробуйте описать другими словами.',
           style: TextStyle(color: AW.soft),
         ),
       Wrap(
@@ -226,7 +226,7 @@ class _OmensScreenState extends State<OmensScreen> {
             ),
         ],
       ),
-      if (sel != null) ...[const SizedBox(height: 14), _OmenCard(key: ValueKey(sel.id), omen: sel, app: widget.app)],
+      if (sel != null) ...[const SizedBox(height: 16), _OmenCard(key: ValueKey(sel.id), omen: sel, app: widget.app)],
     ];
   }
 
@@ -278,7 +278,7 @@ class _OmenCardState extends State<_OmenCard> {
         children: [
           Text(
             o.name,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AW.gold),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AW.gold),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -291,12 +291,12 @@ class _OmenCardState extends State<_OmenCard> {
                 'традиция: ${o.tradition}',
               ])
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.07),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(t, style: const TextStyle(fontSize: 12.5)),
+                  child: Text(t, style: const TextStyle(fontSize: 13)),
                 ),
             ],
           ),
@@ -307,9 +307,9 @@ class _OmenCardState extends State<_OmenCard> {
             ('А как думаете вы?', o.reflection),
           ]) ...[
             Label(h),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             Text(t, style: const TextStyle(height: 1.4)),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
           ],
           TextField(
             controller: _note,
@@ -327,7 +327,7 @@ class _OmenCardState extends State<_OmenCard> {
                     await widget.app.memory.add(WitchAnswer(DateTime.now(), [o.name], text, 'omen'));
                     setState(() => _saved = true);
                   },
-            child: Text(_saved ? '★ Сохранено в дневник' : '☆ В дневник'),
+            child: Text(_saved ? 'Сохранено в дневник' : 'Сохранить в дневник'),
           ),
         ],
       ),

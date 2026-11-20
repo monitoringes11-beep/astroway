@@ -42,7 +42,7 @@ class _SunMoonScreenState extends State<SunMoonScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Label(h),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Text(t, style: const TextStyle(height: 1.4)),
         ],
       ),
@@ -59,48 +59,48 @@ class _SunMoonScreenState extends State<SunMoonScreen> {
               children: [
                 const Text(
                   'Сегодня для всех',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AW.gold),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AW.gold),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 layer('Энергия Солнца · ${sunLevel(energy)}', sunText(energy, easy: easy)),
                 layer(
                   'Настроение Луны · ${moonLevel(moon.phase)}',
-                  '${moonText(moon.phase, easy: easy)} ${moon.lunarDay}-й лунный день, освещена на ${moon.percent}%.',
+                  '${moonText(moon.phase, easy: easy)} ${moon.lunarDay}-й лунный день, освещена на ${moon.percent}\u00A0%.',
                 ),
                 Text(
                   'Баланс дня: ${balanceText(energy, easy: easy)}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, height: 1.4),
+                  style: const TextStyle(fontWeight: FontWeight.w500, height: 1.4),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           GlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${p.name}, твои Солнце и Луна сегодня',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AW.gold),
+                  '${p.name}, ваши Солнце и Луна сегодня',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AW.gold),
                 ),
-                const SizedBox(height: 10),
-                layer('☀️ Солнце: ${signs[sign].name}', personalSun(sign, energy)),
-                layer('🌙 Луна: эмоциональный фон', personalMoon(moon.phase, easy: easy)),
-                layer('☯ Как это сочетается с днём', rhythmText(rhythmFits(sign, energy, moon.phase))),
+                const SizedBox(height: 12),
+                layer('Солнце: ${signs[sign].name}', personalSun(sign, energy)),
+                layer('Луна: эмоциональный фон', personalMoon(moon.phase, easy: easy)),
+                layer('Как это сочетается с днём', rhythmText(rhythmFits(sign, energy, moon.phase))),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           GlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Label('Знак Луны · мини-задание'),
-                const SizedBox(height: 6),
-                Text(task[0], style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
+                Text(task[0], style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 8),
                 Text(task[1], style: const TextStyle(height: 1.4)),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 TextField(
                   controller: _note,
                   minLines: 2,
@@ -117,7 +117,7 @@ class _SunMoonScreenState extends State<SunMoonScreen> {
                           await widget.app.memory.add(WitchAnswer(now, [moon.name], t, 'moon'));
                           setState(() => _saved = true);
                         },
-                  child: Text(_saved ? '★ Сохранено в дневник' : '☆ В дневник'),
+                  child: Text(_saved ? 'Сохранено в дневник' : 'Сохранить в дневник'),
                 ),
               ],
             ),

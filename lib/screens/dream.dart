@@ -51,12 +51,12 @@ class _DreamScreenState extends State<DreamScreen> {
       },
       onError: (e) => setState(() {
         _listening = false;
-        _voiceError = 'Не получилось распознать речь. Попробуй ещё раз или напиши сон текстом.';
+        _voiceError = 'Не получилось распознать речь. Попробуйте ещё раз или напишите сон текстом.';
       }),
     );
     if (!ok) {
       setState(
-        () => _voiceError = 'Нет доступа к микрофону. Разреши его в настройках телефона или напиши сон текстом.',
+        () => _voiceError = 'Нет доступа к микрофону. Разрешите его в настройках телефона или напишите сон текстом.',
       );
       return;
     }
@@ -102,12 +102,12 @@ class _DreamScreenState extends State<DreamScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
-          const Text('Расскажи свой сон', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+          const Text('Расскажите свой сон', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w500)),
           const SizedBox(height: 12),
           SegmentedButton<bool>(
             segments: const [
-              ButtonSegment(value: true, label: Text('🎙 Голосом')),
-              ButtonSegment(value: false, label: Text('✎ Написать')),
+              ButtonSegment(value: true, icon: Icon(Icons.mic_none, size: 18), label: Text('Голосом')),
+              ButtonSegment(value: false, icon: Icon(Icons.edit_outlined, size: 18), label: Text('Текстом')),
             ],
             selected: {_voice},
             showSelectedIcon: false,
@@ -119,15 +119,15 @@ class _DreamScreenState extends State<DreamScreen> {
               child: GestureDetector(
                 onTap: _toggleMic,
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
+                  duration: const Duration(milliseconds: 180),
+                  curve: const Cubic(0.22, 1, 0.36, 1),
                   width: 96,
                   height: 96,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const RadialGradient(colors: [Color(0xFFFFE2A0), Color(0xFFD9A949)]),
-                    boxShadow: [
-                      if (_listening) BoxShadow(color: AW.gold.withValues(alpha: 0.6), blurRadius: 30, spreadRadius: 6),
-                    ],
+                    color: AW.gold,
+                    // Пока идёт запись — тонкое кольцо вокруг кнопки, чтобы было видно, что микрофон слушает.
+                    border: Border.all(color: _listening ? AW.ink : Colors.transparent, width: 3),
                   ),
                   child: Icon(
                     _listening ? Icons.stop_rounded : Icons.mic_rounded,
@@ -137,12 +137,12 @@ class _DreamScreenState extends State<DreamScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Text(
               _voiceError ??
                   (_listening
-                      ? (_heard.isEmpty ? 'Слушаю… Расскажи сон и нажми ещё раз, чтобы закончить' : '«$_heard»')
-                      : (_heard.isEmpty ? 'Нажми и расскажи сон своими словами' : 'Распознано: «$_heard»')),
+                      ? (_heard.isEmpty ? 'Слушаю… Расскажите сон и нажмите ещё раз, чтобы закончить' : '«$_heard»')
+                      : (_heard.isEmpty ? 'Нажмите и расскажите сон своими словами' : 'Распознано: «$_heard»')),
               textAlign: TextAlign.center,
               style: TextStyle(color: _voiceError != null ? Colors.orangeAccent : AW.soft),
             ),
@@ -153,7 +153,7 @@ class _DreamScreenState extends State<DreamScreen> {
               maxLines: 6,
               decoration: const InputDecoration(hintText: 'Например: змея, или «я летала над морем»'),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             FilledButton(
               onPressed: () {
                 final t = _input.text.trim();
@@ -163,70 +163,70 @@ class _DreamScreenState extends State<DreamScreen> {
             ),
           ],
           if (r != null) ...[
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             GlassCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'Толкование волшебницы',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AW.gold),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AW.gold),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(
                     '«${r.text}»',
-                    style: const TextStyle(fontStyle: FontStyle.italic, color: AW.soft),
+                    style: const TextStyle(color: AW.soft),
                   ),
                   const Divider(height: 24),
                   if (r.symbols.isEmpty)
                     const Text(
                       'Этого образа пока нет в нашей базе сонников. Волшебница не будет придумывать: '
-                      'попробуй назвать главный образ сна другим словом (например, «дождь», «река», «дом»). '
+                      'попробуйте назвать главный образ сна другим словом (например, «дождь», «река», «дом»). '
                       'Мы записали этот сон и добавим символ в базу.',
                     ),
                   for (final s in r.symbols) ...[
-                    Text(s.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                    Text(s.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
                     const SizedBox(height: 4),
                     Label('Классический сонник · ${s.source}'),
                     Text(s.classic, style: const TextStyle(height: 1.4)),
                     if (s.folk != null) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       const Label('Народные приметы'),
                       Text(s.folk!, style: const TextStyle(height: 1.4)),
                     ],
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                   ],
                   if (r.memoryLine != null)
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AW.gold.withValues(alpha: 0.13),
-                        borderRadius: BorderRadius.circular(12),
+                        color: AW.gold.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text('🔮 ${r.memoryLine}', style: const TextStyle(height: 1.4)),
+                      child: IconLine(Icons.auto_stories_outlined, r.memoryLine!),
                     ),
                   Text(r.personal, style: const TextStyle(height: 1.4)),
-                  const SizedBox(height: 10),
-                  const Text(sourcesNote, style: TextStyle(color: AW.soft, fontSize: 12.5)),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
+                  const Text(sourcesNote, style: TextStyle(color: AW.soft, fontSize: 13)),
+                  const SizedBox(height: 12),
                   const Text(
                     signoff,
-                    style: TextStyle(color: AW.gold, fontWeight: FontWeight.w700),
+                    style: TextStyle(color: AW.gold, fontWeight: FontWeight.w500),
                   ),
                   if (r.symbols.isNotEmpty) ShareButton(content: () => shareDream(r)),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0x1AA0BEFF),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0x4DA0BEFF)),
+                      color: Colors.white.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AW.hairline),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('🔮 Вопрос волшебницы', style: TextStyle(fontWeight: FontWeight.w700)),
+                        const Text('Вопрос волшебницы', style: TextStyle(fontWeight: FontWeight.w500)),
                         const SizedBox(height: 4),
                         Text(r.witchQuestion),
                         const SizedBox(height: 8),
@@ -234,16 +234,16 @@ class _DreamScreenState extends State<DreamScreen> {
                           controller: _answer,
                           minLines: 2,
                           maxLines: 4,
-                          decoration: const InputDecoration(hintText: 'Ответь своими словами, волшебница запомнит'),
+                          decoration: const InputDecoration(hintText: 'Ответьте своими словами, волшебница запомнит'),
                         ),
                         const SizedBox(height: 8),
                         FilledButton(
                           onPressed: _saved ? null : _saveAnswer,
-                          child: Text(_saved ? 'Запомнила ✓' : 'Запомнить ответ'),
+                          child: Text(_saved ? 'Ответ сохранён' : 'Запомнить ответ'),
                         ),
                         if (_saved)
                           const Padding(
-                            padding: EdgeInsets.only(top: 6),
+                            padding: EdgeInsets.only(top: 8),
                             child: Text(
                               'Учту это в следующих толкованиях и прогнозах.',
                               style: TextStyle(color: AW.soft),

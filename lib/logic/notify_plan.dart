@@ -53,18 +53,11 @@ String moonPhaseName(MoonPhase p) => switch (p) {
   MoonPhase.old => 'Старая Луна',
 };
 
-String _moonEmoji(MoonPhase p) => switch (p) {
-  MoonPhase.newMoon => '🌑',
-  MoonPhase.young => '🌒',
-  MoonPhase.full => '🌕',
-  MoonPhase.old => '🌘',
-};
-
 const _moonBody = {
-  MoonPhase.newMoon: 'Время загадывать желания и задумывать новое. Загляни за заговором на новолуние.',
-  MoonPhase.young: 'Луна растёт: хорошо начинать дела и притягивать. Загляни за заговором на растущую Луну.',
-  MoonPhase.full: 'Пик силы: эмоции яркие, сны самые сильные. Загляни за заговором на полнолуние.',
-  MoonPhase.old: 'Луна убывает: время отпускать и завершать. Загляни за заговором на убывающую Луну.',
+  MoonPhase.newMoon: 'Время загадывать желания и задумывать новое. Загляните за заговором на новолуние.',
+  MoonPhase.young: 'Луна растёт: хорошо начинать дела и притягивать. Загляните за заговором на растущую Луну.',
+  MoonPhase.full: 'Пик силы: эмоции яркие, сны самые сильные. Загляните за заговором на полнолуние.',
+  MoonPhase.old: 'Луна убывает: время отпускать и завершать. Загляните за заговором на убывающую Луну.',
 };
 
 /// Дни, в которые Луна переходит в новую фазу (по сравнению со вчерашним днём).
@@ -86,13 +79,13 @@ List<DateTime> moonChangeDays(DateTime from, int days) {
 ({String title, String body}) forecastNotice(Profile p, DateTime day, {required bool easy, bool private = false}) {
   final sign = signOf(p.birthday);
   final title = '${sign.symbol} Прогноз дня · ${sign.name}';
-  if (private) return (title: 'Прогноз дня готов', body: 'Волшебница ждёт тебя в AstroWay ✨');
+  if (private) return (title: 'Прогноз дня готов', body: 'Волшебница ждёт вас в AstroWay');
   final f = forecastFor(p, DateTime(day.year, day.month, day.day, 12), easy: easy);
   return (title: title, body: '${f.theme}\n${f.mood}');
 }
 
 ({String title, String body}) moonNotice(MoonPhase p) =>
-    (title: '${_moonEmoji(p)} Сегодня: ${moonPhaseName(p)}', body: _moonBody[p]!);
+    (title: 'Сегодня: ${moonPhaseName(p)}', body: _moonBody[p]!);
 
 /// Полный план уведомлений от момента [now]. Прошедшие на сегодня не ставим.
 /// [profile] — чей прогноз присылать; null — прогноз не присылаем (никто не вошёл).

@@ -70,21 +70,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             if (widget.initial == null) ...[
               const Text(
                 'AstroWay',
-                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700, color: AW.gold),
+                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w500, color: AW.gold),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text('Сонник, гороскоп, расклады', style: TextStyle(color: AW.soft, fontSize: 16)),
               const SizedBox(height: 24),
-              const Text('Давай познакомимся, чтобы прогнозы были именно для тебя.', style: TextStyle(fontSize: 16)),
+              const Text('Давайте познакомимся, чтобы прогнозы были именно для вас.', style: TextStyle(fontSize: 16)),
               const SizedBox(height: 20),
             ],
             TextField(
               controller: _name,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Как тебя зовут?'),
+              decoration: const InputDecoration(labelText: 'Как вас зовут?'),
               onChanged: (_) => setState(() {}),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             const Label('Пол (необязательно)'),
             const SizedBox(height: 8),
             SegmentedButton<Gender>(
@@ -97,7 +97,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               showSelectedIcon: false,
               onSelectionChanged: (s) => setState(() => _gender = s.first),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             const Label('Дата рождения'),
             const SizedBox(height: 8),
             OutlinedButton(
@@ -117,12 +117,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
               if (!_oldEnough)
                 const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: Text('Приложение для пользователей от 16 лет.', style: TextStyle(color: Colors.orangeAccent)),
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text('Приложение для пользователей от 16 лет', style: TextStyle(color: Colors.orangeAccent)),
                 ),
             ],
-            const SizedBox(height: 18),
-            const Label('Время рождения (если знаешь)'),
+            const SizedBox(height: 20),
+            const Label('Время рождения (если знаете)'),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -137,7 +137,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             CheckboxListTile(
               value: _consent,
               contentPadding: EdgeInsets.zero,
@@ -145,7 +145,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               onChanged: (v) => setState(() => _consent = v ?? false),
               title: const Text(
                 'Мне есть 16 лет. Я согласна(ен) на обработку персональных данных (152-ФЗ) и понимаю, что прогнозы носят развлекательный характер.',
-                style: TextStyle(fontSize: 13.5),
+                style: TextStyle(fontSize: 14),
               ),
             ),
             const SizedBox(height: 12),

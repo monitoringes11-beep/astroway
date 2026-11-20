@@ -59,9 +59,9 @@ class ProfilesScreen extends StatelessWidget {
           children: [
             const Text(
               'AstroWay',
-              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700, color: AW.gold),
+              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w500, color: AW.gold),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             const Text('Кто заходит?', style: TextStyle(color: AW.soft, fontSize: 17)),
             const SizedBox(height: 20),
             for (final e in list) ...[
@@ -73,12 +73,12 @@ class ProfilesScreen extends StatelessWidget {
                     child: Row(
                       children: [
                         Text(signOf(e.profile.birthday).symbol, style: const TextStyle(fontSize: 30, color: AW.gold)),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(e.profile.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                              Text(e.profile.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
                               Text(signOf(e.profile.birthday).name, style: const TextStyle(color: AW.soft)),
                             ],
                           ),
@@ -94,9 +94,9 @@ class ProfilesScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
             ],
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: () =>
                   Navigator.of(context)
@@ -107,7 +107,7 @@ class ProfilesScreen extends StatelessWidget {
             const SizedBox(height: 16),
             const Text(
               'Профили хранятся только на этом телефоне. Код входа можно поставить в меню на главном экране.',
-              style: TextStyle(color: AW.soft, fontSize: 12.5),
+              style: TextStyle(color: AW.soft, fontSize: 13),
             ),
           ],
         ),
