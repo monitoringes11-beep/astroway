@@ -63,7 +63,7 @@ NumResult dayNumber(DateTime birthday, DateTime today) {
   final d = digitsOf('${_dd(today.day)}${_dd(today.month)}${today.year}');
   final t = reduceNum(_sum(d), keepMaster: false).n;
   final r = reduceNum(t + lp, keepMaster: false);
-  return NumResult(r.n, ['сегодня ${d.join('+')} → $t', '+ твоё $lp = ${t + lp}', ...r.steps]);
+  return NumResult(r.n, ['сегодня ${d.join('+')} → $t', '+ ваше $lp = ${t + lp}', ...r.steps]);
 }
 
 NumResult personalYear(DateTime birthday, int year) {
@@ -110,13 +110,11 @@ String genderize(String s, bool? female) => s.replaceAllMapped(RegExp(r'\{([^|}]
 
 String _firstSentence(String t) => t.split(RegExp(r'(?<=\.)\s')).first.replaceAll(RegExp(r'\.$'), '');
 
-const sphereEmoji = {'general': '✨', 'love': '💞', 'money': '💰', 'health': '🌿'};
-
 /// Текст по сфере с учётом тона «Легко».
 String sphereText(int n, String sphere, String base, {required bool easy}) {
-  if (sphere == 'general') return easy ? '${_firstSentence(base)} 🔮' : base;
+  if (sphere == 'general') return easy ? _firstSentence(base) : base;
   final t = sphereTexts[sphere]![n]!;
   if (!easy) return t;
   if (n == 7 && sphere == 'money') return easy7Money;
-  return '${_firstSentence(t)} ${sphereEmoji[sphere]}';
+  return _firstSentence(t);
 }

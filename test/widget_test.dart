@@ -137,7 +137,7 @@ void main() {
     expect(interpretDream('вода', anna, now, mem).memoryLine, isNull);
     await mem.add(WitchAnswer(now, ['Вода'], 'переезд', 'dream'));
     final r = interpretDream('пила чистую воду', anna, now, mem);
-    expect(r.memoryLine, contains('связала образ «Вода»'));
+    expect(r.memoryLine, contains('связали образ «Вода»'));
     expect(r.memoryLine, contains('переезд'));
     expect(r.witchQuestion, contains('Вода'));
   });
@@ -170,7 +170,7 @@ void main() {
     await app.store.saveProfile(anna);
     await tester.pumpWidget(MaterialApp(home: HoroscopeScreen(app: app)));
     expect(find.textContaining('Скорпион'), findsWidgets);
-    for (final tab in ['На неделю', 'Восточный', '💎 Совместимость', 'На сегодня']) {
+    for (final tab in ['На неделю', 'Восточный', 'Совместимость', 'На сегодня']) {
       await tester.tap(find.text(tab));
       await tester.pumpAndSettle();
     }
@@ -201,7 +201,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: NumerologyScreen(app: app)));
     await tester.pumpAndSettle();
     expect(find.text('8'), findsOneWidget);
-    for (final tab in ['Число имени', 'Число дня', 'Личный год', '💎 Совместимость', 'Моё число']) {
+    for (final tab in ['Число имени', 'Число дня', 'Личный год', 'Совместимость', 'Моё число']) {
       await tester.tap(find.text(tab));
       await tester.pumpAndSettle();
     }
@@ -230,7 +230,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: OmensScreen(app: app)));
     await tester.tap(find.text('Встретила знак'));
     await tester.pumpAndSettle();
-    expect(find.text('ЧТО ГОВОРИТ ПРИМЕТА'), findsOneWidget);
+    expect(find.text('Что говорит примета'), findsOneWidget);
     await tester.tap(find.text('Словарь'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'соль');
@@ -256,8 +256,8 @@ void main() {
     final app = AppState(Store(await SharedPreferences.getInstance()));
     await app.store.saveProfile(anna);
     await tester.pumpWidget(MaterialApp(home: SunMoonScreen(app: app)));
-    expect(find.textContaining('твои Солнце и Луна'), findsOneWidget);
-    expect(find.textContaining('СКОРПИОН'), findsOneWidget);
+    expect(find.textContaining('ваши Солнце и Луна'), findsOneWidget);
+    expect(find.textContaining('Солнце: Скорпион'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -303,7 +303,7 @@ void main() {
     await tester.tap(find.text('Короче ладони'));
     await tester.pumpAndSettle();
     expect(find.text('Земная рука'), findsOneWidget);
-    await tester.tap(find.text('💎 По фото'));
+    await tester.tap(find.text('По фото'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
@@ -381,8 +381,8 @@ void main() {
 
   test('обратная связь: поля без личных данных и очередь без сети', () async {
     final f = feedbackFields(
-      mood: '🙂',
-      kinds: {'✨ Не хватает'},
+      mood: 'Хорошо',
+      kinds: {'Не хватает'},
       sections: {'Сонник'},
       text: 'Нет слова вокзал',
       missed: ['вокзал'],
@@ -412,8 +412,8 @@ void main() {
     final app = AppState(Store(await SharedPreferences.getInstance()));
     await app.store.saveProfile(anna);
     await tester.pumpWidget(MaterialApp(home: FeedbackScreen(app: app)));
-    await tester.tap(find.text('😍'));
-    await tester.tap(find.text('✨ Не хватает'));
+    await tester.tap(find.text('Отлично'));
+    await tester.tap(find.text('Не хватает'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.byType(FilledButton), 200, scrollable: find.byType(Scrollable).first);
     expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNotNull);
@@ -469,7 +469,7 @@ void main() {
     await tester.tap(find.text('Поделиться'));
     await tester.pumpAndSettle();
     expect(find.byType(ShareCard), findsOneWidget);
-    expect(find.text('Так увидят твои друзья'), findsOneWidget);
+    expect(find.text('Так увидят ваши друзья'), findsOneWidget);
     await tester.runAsync(() async {
       await tester.tap(find.text('Отправить'));
       for (var i = 0; i < 50 && png == null; i++) {
@@ -494,7 +494,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('Поделиться'), 200, scrollable: find.byType(Scrollable).first);
     expect(find.text('Поделиться'), findsOneWidget);
     await tester.pumpWidget(MaterialApp(home: DreamScreen(app: app)));
-    await tester.tap(find.text('✎ Написать'));
+    await tester.tap(find.text('Текстом'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'змея');
     await tester.tap(find.text('Толковать сон'));

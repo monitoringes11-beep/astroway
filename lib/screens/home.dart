@@ -9,6 +9,8 @@ import '../logic/zodiac.dart';
 import '../main.dart';
 import '../logic/share_content.dart';
 import '../theme.dart';
+import '../data/horoscope_bank.dart' show weekdayNames;
+import '../widgets/moon_glyph.dart';
 import '../widgets/share_card.dart';
 import 'dream.dart';
 import 'feedback.dart';
@@ -106,23 +108,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     const Text(
                       'AstroWay',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AW.gold),
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500, color: AW.gold),
                     ),
                     const Spacer(),
                     Text(
                       '${_now.hour.toString().padLeft(2, '0')}:${_now.minute.toString().padLeft(2, '0')}',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: const TextStyle(fontSize: 16, fontFeatures: [FontFeature.tabularFigures()]),
                     ),
                     ProfileMenu(app: app),
                   ],
                 ),
                 const SizedBox(height: 160),
                 Text(
-                  '${greetingFor(_now)}, ${p.name}',
-                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+                  '${weekdayNames[_now.weekday - 1]}, ${shareDate(_now)}',
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w500, height: 1.15),
                 ),
+                const SizedBox(height: 4),
                 Text(
-                  '${sign.symbol} ${sign.name} · $age ${yearsWord(age)}',
+                  '${greetingFor(_now)}, ${p.name} · ${sign.symbol} ${sign.name} · $age ${yearsWord(age)}',
                   style: const TextStyle(color: AW.soft, fontSize: 15),
                 ),
                 const SizedBox(height: 12),
@@ -131,26 +134,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 GlassCard(
                   child: Row(
                     children: [
-                      Text(
-                        moon.phase == MoonPhase.full
-                            ? '🌕'
-                            : moon.phase == MoonPhase.newMoon
-                            ? '🌑'
-                            : moon.phase == MoonPhase.young
-                            ? '🌒'
-                            : '🌘',
-                        style: const TextStyle(fontSize: 40),
-                      ),
-                      const SizedBox(width: 14),
+                      MoonGlyph(moon, size: 56),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Label('Луна сегодня'),
                             const SizedBox(height: 4),
-                            Text(moon.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                            Text(moon.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
                             Text(
-                              '${moon.lunarDay}-й лунный день · освещена на ${moon.percent}%',
+                              '${moon.lunarDay}-й лунный день · освещена на ${moon.percent}\u00A0%',
                               style: const TextStyle(color: AW.soft, fontSize: 13),
                             ),
                             const SizedBox(height: 4),
@@ -191,19 +185,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       Text(
                         f.theme,
-                        style: const TextStyle(color: AW.gold, fontSize: 15, fontWeight: FontWeight.w600),
+                        style: const TextStyle(color: AW.gold, fontSize: 15, fontWeight: FontWeight.w500),
                       ),
-                      _Line('Что принесёт день', '💞 ${f.love}\n💼 ${f.work}\n✨ ${f.mood}'),
-                      _Line('Лучшее время', '🕰 ${f.timing}'),
-                      _Line('Чего сторониться', f.avoid.map((e) => '• $e').join('\n')),
-                      _Line('К чему готовиться', f.prepare.map((e) => '• $e').join('\n')),
-                      if (f.memory != null) _Line('Волшебница помнит', '🔮 ${f.memory}'),
+                      _Section('Что принесёт день', [
+                        IconLine(Icons.favorite_border, f.love),
+                        IconLine(Icons.work_outline, f.work),
+                        IconLine(Icons.light_mode_outlined, f.mood),
+                      ]),
+                      _Section('Лучшее время', [IconLine(Icons.schedule, f.timing)]),
+                      _Section('Чего сторониться', [for (final e in f.avoid) IconLine(Icons.remove, e)]),
+                      _Section('К чему готовиться', [for (final e in f.prepare) IconLine(Icons.check, e)]),
+                      if (f.memory != null) _Section('Волшебница помнит', [IconLine(Icons.auto_stories_outlined, f.memory!)]),
                       if (p.birthSlot == slotUnknown)
                         const Padding(
                           padding: EdgeInsets.only(top: 8),
                           child: Text(
-                            'Общий прогноз по знаку. Укажи время рождения, и прогноз станет личным.',
-                            style: TextStyle(color: AW.soft, fontSize: 12.5),
+                            'Это общий прогноз по знаку. Укажите время рождения, и он станет личным',
+                            style: TextStyle(color: AW.muted, fontSize: 13),
                           ),
                         ),
                       ShareButton(content: () => shareForecast(f, sign, _now)),
@@ -215,52 +213,52 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisCount: 3,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
                   childAspectRatio: 1.05,
                   children: [
                     _Tile(
-                      '🌙',
+                      Icons.bedtime_outlined,
                       'Сонник',
                       () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DreamScreen(app: app))),
                     ),
                     _Tile(
-                      '☀️',
+                      Icons.wb_sunny_outlined,
                       'Гороскоп',
                       () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => HoroscopeScreen(app: app))),
                     ),
                     _Tile(
-                      '🃏',
+                      Icons.style_outlined,
                       'Расклады',
                       () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TarotScreen(app: app))),
                     ),
                     _Tile(
-                      '⭐',
+                      Icons.explore_outlined,
                       'Знаки судьбы',
                       () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OmensScreen(app: app))),
                     ),
                     _Tile(
-                      '🌗',
+                      Icons.brightness_4_outlined,
                       'Луна и Солнце',
                       () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SunMoonScreen(app: app))),
                     ),
                     _Tile(
-                      '7',
+                      Icons.numbers,
                       'Нумерология',
                       () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NumerologyScreen(app: app))),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 _Tile(
-                  '✋',
+                  Icons.back_hand_outlined,
                   'Тайны ладони',
                   () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PalmScreen(app: app))),
                   wide: true,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 _Tile(
-                  '💬',
+                  Icons.chat_bubble_outline,
                   'Обратная связь',
                   () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => FeedbackScreen(app: app))),
                   wide: true,
@@ -268,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 const Text(
                   'Приложение носит развлекательный характер. Не является рекомендацией для принятия важных решений.',
-                  style: TextStyle(color: AW.soft, fontSize: 11.5),
+                  style: TextStyle(color: AW.muted, fontSize: 12),
                 ),
               ],
             ),
@@ -323,18 +321,24 @@ class _SunMoon extends StatelessWidget {
     required this.balance,
   });
 
-  Widget _half(String label, Color c, String lvl, String tx) => Expanded(
+  Widget _half(String label, IconData icon, String lvl, String tx) => Expanded(
     child: Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: AW.navy.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(color: AW.navy.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(8)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Label(label, color: c),
+          Row(
+            children: [
+              Icon(icon, size: 18, color: AW.muted),
+              const SizedBox(width: 8),
+              Expanded(child: Label(label)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(lvl, style: const TextStyle(fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
-          Text(lvl, style: const TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text(tx, style: const TextStyle(fontSize: 13.5, height: 1.35)),
+          Text(tx, style: const TextStyle(fontSize: 14, height: 1.4)),
         ],
       ),
     ),
@@ -342,24 +346,18 @@ class _SunMoon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return GlassCard(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: const LinearGradient(colors: [Color(0x55FFCE6E), Color(0x556EA0FF)]),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-        ),
-        child: Column(
+      padding: const EdgeInsets.all(8),
+      child: Column(
           children: [
             IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _half('Энергия Солнца', AW.gold, sunLvl, sunTx),
+                  _half('Энергия Солнца', Icons.wb_sunny_outlined, sunLvl, sunTx),
                   const SizedBox(width: 8),
-                  _half('Настроение Луны', const Color(0xFFA9C8FF), moonLvl, moonTx),
+                  _half('Настроение Луны', Icons.bedtime_outlined, moonLvl, moonTx),
                 ],
               ),
             ),
@@ -367,51 +365,51 @@ class _SunMoon extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: AW.navy.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(14)),
-              child: Text('Баланс дня: $balance  ›', style: const TextStyle(fontSize: 14, height: 1.35)),
+              decoration: BoxDecoration(color: AW.navy.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(8)),
+              child: Row(
+                children: [
+                  Expanded(child: Text('Баланс дня: $balance', style: const TextStyle(fontSize: 14, height: 1.4))),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right, size: 18, color: AW.muted),
+                ],
+              ),
             ),
           ],
-        ),
       ),
     );
   }
 }
 
-class _Line extends StatelessWidget {
-  final String title, body;
-  const _Line(this.title, this.body);
+class _Section extends StatelessWidget {
+  final String title;
+  final List<Widget> lines;
+  const _Section(this.title, this.lines);
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 8),
+    padding: const EdgeInsets.only(top: 16),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w700, color: AW.soft),
-        ),
-        const SizedBox(height: 2),
-        Text(body, style: const TextStyle(fontSize: 14.5, height: 1.4)),
+        Label(title),
+        for (final l in lines) Padding(padding: const EdgeInsets.only(top: 8), child: l),
       ],
     ),
   );
 }
 
 class _Tile extends StatelessWidget {
-  final String icon, title;
+  final IconData icon;
+  final String title;
   final VoidCallback onTap;
   final bool wide;
   const _Tile(this.icon, this.title, this.onTap, {this.wide = false});
   @override
   Widget build(BuildContext context) {
-    final iconW = Text(
-      icon,
-      style: const TextStyle(fontSize: 26, color: AW.gold, fontWeight: FontWeight.w700),
-    );
+    final iconW = Icon(icon, size: 24, color: AW.soft);
     final titleW = Text(
       title,
       textAlign: TextAlign.center,
-      style: const TextStyle(fontWeight: FontWeight.w600),
+      style: const TextStyle(fontWeight: FontWeight.w500),
     );
     return GlassCard(
       onTap: onTap,

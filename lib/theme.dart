@@ -6,6 +6,10 @@ class AW {
   static const gold = Color(0xFFF3C96B);
   static const ink = Color(0xFFEAF0FF);
   static const soft = Color(0xFFA9B8E0);
+  /// Подписи и мета: тише основного текста, но читаемо на тёмно-синем.
+  static const muted = Color(0xFF8593BC);
+  /// Тонкая линия-разделитель вместо цветных рамок.
+  static const hairline = Color(0x14FFFFFF);
   static const darkText = Color(0xFF14203F);
 }
 
@@ -33,13 +37,13 @@ ThemeData buildTheme() {
       style: FilledButton.styleFrom(
         minimumSize: const Size.fromHeight(50),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
       ),
     ),
   );
 }
 
-/// Полупрозрачная карточка в стиле макета.
+/// Полупрозрачная карточка: тёмно-синяя поверхность и тонкая линия по краю.
 class GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -53,26 +57,48 @@ class GlassCard extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: color ?? AW.deep.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AW.hairline),
       ),
       child: child,
     );
     if (onTap == null) return card;
     return Material(
       color: Colors.transparent,
-      child: InkWell(borderRadius: BorderRadius.circular(20), onTap: onTap, child: card),
+      child: InkWell(borderRadius: BorderRadius.circular(16), onTap: onTap, child: card),
     );
   }
 }
 
+/// Подпись раздела: обычный регистр, без разрядки, приглушённый цвет.
 class Label extends StatelessWidget {
   final String text;
   final Color color;
-  const Label(this.text, {super.key, this.color = AW.gold});
+  const Label(this.text, {super.key, this.color = AW.soft});
   @override
   Widget build(BuildContext context) => Text(
-    text.toUpperCase(),
-    style: TextStyle(color: color, fontSize: 11.5, letterSpacing: 0.8, fontWeight: FontWeight.w600),
+    text,
+    style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w500),
+  );
+}
+
+/// Строка «иконка + текст»: одна линейная иконка 18 px в цвете подписи,
+/// одинаковый отступ до текста, чтобы тексты стояли в одну колонку.
+class IconLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final TextStyle? style;
+  const IconLine(this.icon, this.text, {super.key, this.style});
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Icon(icon, size: 18, color: AW.muted),
+      ),
+      const SizedBox(width: 8),
+      Expanded(child: Text(text, style: style ?? const TextStyle(fontSize: 15, height: 1.4))),
+    ],
   );
 }

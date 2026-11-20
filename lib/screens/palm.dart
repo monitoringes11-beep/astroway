@@ -13,7 +13,7 @@ import '../widgets/share_card.dart';
 
 enum PalmTab { scheme, type, photo }
 
-/// «Тайны ладони»: схема линий, тип руки и 💎 разбор по своему фото.
+/// «Тайны ладони»: схема линий, тип руки и разбор по своему фото (по подписке).
 /// Фото обрабатывается только на телефоне и по умолчанию удаляется при выходе.
 class PalmScreen extends StatefulWidget {
   final AppState app;
@@ -76,7 +76,7 @@ class _PalmScreenState extends State<PalmScreen> {
               for (final (t, label) in [
                 (PalmTab.scheme, 'Схема линий'),
                 (PalmTab.type, 'Тип руки'),
-                (PalmTab.photo, '💎 По фото'),
+                (PalmTab.photo, 'По фото'),
               ])
                 ChoiceChip(
                   label: Text(label),
@@ -119,8 +119,8 @@ class _PalmScreenState extends State<PalmScreen> {
     return [
       Text(
         left == 0
-            ? 'Все линии прочитаны ✓ Итог сохранён в дневник.'
-            : 'Прочитано ${_answers.length} из ${palmLines.length}. Выбери линию ниже или нажми на неё на схеме.',
+            ? 'Все линии прочитаны. Итог сохранён в дневник.'
+            : 'Прочитано ${_answers.length} из ${palmLines.length}. Выберите линию ниже или нажмите на неё на схеме.',
         style: const TextStyle(color: AW.soft),
       ),
       const SizedBox(height: 8),
@@ -137,8 +137,8 @@ class _PalmScreenState extends State<PalmScreen> {
             ),
         ],
       ),
-      const SizedBox(height: 14),
-      Text(l.question, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+      const SizedBox(height: 16),
+      Text(l.question, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
       const SizedBox(height: 8),
       Wrap(
         spacing: 8,
@@ -154,7 +154,7 @@ class _PalmScreenState extends State<PalmScreen> {
         ],
       ),
       if (_answers[l.id] != null) ...[
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         _reading(l, l.variants.firstWhere((v) => v.id == _answers[l.id])),
         const SizedBox(height: 4),
         if (next != null)
@@ -163,7 +163,7 @@ class _PalmScreenState extends State<PalmScreen> {
             child: Text('Дальше: ${palmLines.firstWhere((x) => x.id == next).name} →'),
           ),
       ],
-      if (left == 0) ...[const SizedBox(height: 14), _summary()],
+      if (left == 0) ...[const SizedBox(height: 16), _summary()],
     ];
   }
 
@@ -175,17 +175,17 @@ class _PalmScreenState extends State<PalmScreen> {
         children: [
           const Text(
             'Итог по всем линиям',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AW.gold),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500, color: AW.gold),
           ),
           const SizedBox(height: 8),
           for (final l in palmLines) ...[
-            Text('${l.sphere} · ${l.name}', style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text('${l.sphere} · ${l.name}', style: const TextStyle(fontWeight: FontWeight.w500)),
             const SizedBox(height: 2),
             Text(() {
               final v = l.variants.firstWhere((v) => v.id == _answers[l.id]);
               return easy ? v.adviceEasy : v.adviceSerious;
             }(), style: const TextStyle(height: 1.4)),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
           ],
           ShareButton(content: () => sharePalm(_answers, easy: easy)),
         ],
@@ -209,20 +209,20 @@ class _PalmScreenState extends State<PalmScreen> {
         children: [
           Text(
             '${l.name}: ${v.label.toLowerCase()}',
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AW.gold),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500, color: AW.gold),
           ),
           const SizedBox(height: 4),
           Text(l.sphere, style: const TextStyle(color: AW.soft, fontSize: 13)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           for (final (h, t) in [
             ('Что говорит традиция', easy ? v.traditionEasy : v.traditionSerious),
             ('Совет', easy ? v.adviceEasy : v.adviceSerious),
             ('А как думаете вы?', l.reflection),
           ]) ...[
             Label(h),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             Text(t, style: const TextStyle(height: 1.4)),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
           ],
         ],
       ),
@@ -234,7 +234,7 @@ class _PalmScreenState extends State<PalmScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: const TextStyle(color: AW.soft)),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -253,14 +253,14 @@ class _PalmScreenState extends State<PalmScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
       ],
     );
     final ready = _squarePalm != null && _shortFingers != null;
     final h = ready ? handTypes[handTypeKey(squarePalm: _squarePalm!, shortFingers: _shortFingers!)]! : null;
     return [
       q(
-        'Посмотри на свою ладонь (без пальцев). Она скорее:',
+        'Посмотрите на свою ладонь (без пальцев). Она скорее:',
         _squarePalm,
         'Квадратная, ширина ≈ длине',
         'Вытянутая, длиннее, чем шире',
@@ -280,10 +280,10 @@ class _PalmScreenState extends State<PalmScreen> {
             children: [
               Text(
                 h[0],
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AW.gold),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AW.gold),
               ),
-              const SizedBox(height: 6),
-              Text('${h[1]}${widget.app.easy ? ' ✨' : ''}', style: const TextStyle(height: 1.4)),
+              const SizedBox(height: 8),
+              Text(h[1], style: const TextStyle(height: 1.4)),
             ],
           ),
         ),
@@ -296,12 +296,12 @@ class _PalmScreenState extends State<PalmScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Label('Премиум · в подписке'),
-          const SizedBox(height: 6),
-          const Text('Как сделать фото', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
+          const Text('Как сделать фото', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 8),
           const Text(
-            'Сними кольца, расслабь руку и сфотографируй раскрытую ладонь при дневном свете. '
-            'Поверх фото появится схема линий: сравни её со своей ладонью и ответь на вопросы.',
+            'Снимите кольца, расслабьте руку и сфотографируйте раскрытую ладонь при дневном свете. '
+            'Поверх фото появится схема линий: сравните её со своей ладонью и ответьте на вопросы.',
             style: TextStyle(height: 1.4),
           ),
           const SizedBox(height: 12),
@@ -333,18 +333,18 @@ class _PalmScreenState extends State<PalmScreen> {
                 const Expanded(
                   child: Text(
                     'Не сохранять фото. Оно обрабатывается только на телефоне и никуда не отправляется.',
-                    style: TextStyle(fontSize: 13.5),
+                    style: TextStyle(fontSize: 14),
                   ),
                 ),
               ],
             ),
           ),
-          const Text('💎 В тестовой сборке открыто.', style: TextStyle(color: AW.soft, fontSize: 12.5)),
+          const Text('В магазине это будет по подписке, в тестовой сборке открыто.', style: TextStyle(color: AW.muted, fontSize: 13)),
         ],
       ),
     ),
     if (_photo != null) ...[
-      const SizedBox(height: 14),
+      const SizedBox(height: 16),
       ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Stack(

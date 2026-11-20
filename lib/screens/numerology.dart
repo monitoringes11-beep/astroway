@@ -8,7 +8,7 @@ import '../theme.dart';
 
 enum NumTab { life, name, day, year, comp }
 
-/// Нумерология: моё число, число имени, число дня, личный год, совместимость (💎).
+/// Нумерология: моё число, число имени, число дня, личный год, совместимость (по подписке).
 class NumerologyScreen extends StatefulWidget {
   final AppState app;
   const NumerologyScreen({super.key, required this.app});
@@ -57,13 +57,13 @@ class _NumerologyScreenState extends State<NumerologyScreen> {
       case NumTab.name:
         r = nameNumber(p.name, p.birthday);
         head = 'Число имени «${p.name}»';
-        text = 'Как тебя видят люди: ${numMeanings[r.n]![1]}. ${numMeanings[r.n]![2]}';
+        text = 'Как вас видят люди: ${numMeanings[r.n]![1]}. ${numMeanings[r.n]![2]}';
         when = 'Каждая буква имеет число (А=1, Б=2 … по кругу до 9).';
       case NumTab.day:
         r = dayNumber(p.birthday, now);
         head = 'Число дня: ${now.day} ${_months[now.month - 1]}';
         text = dayTexts[r.n]!;
-        when = 'Меняется каждый день и зависит от твоего числа жизненного пути.';
+        when = 'Меняется каждый день и зависит от вашего числа жизненного пути.';
       case NumTab.year:
         r = personalYear(p.birthday, now.year);
         head = 'Личный год ${now.year}';
@@ -71,11 +71,11 @@ class _NumerologyScreenState extends State<NumerologyScreen> {
         when = 'День и месяц рождения + текущий год. Обновляется в день рождения.';
       case NumTab.comp:
         final c = numCompatibility(p.birthday, _partner);
-        r = NumResult(0, ['ты: ${c.a}', 'партнёр: ${c.b}']);
+        r = NumResult(0, ['вы: ${c.a}', 'партнёр: ${c.b}']);
         title = '${c.a} + ${c.b}';
         head = c.level;
         text = c.text;
-        when = 'Сравниваются числа жизненного пути. 💎 В магазине будет по подписке, в тестовой сборке открыто.';
+        when = 'Сравниваются числа жизненного пути. В магазине это будет по подписке, в тестовой сборке открыто.';
     }
     if (_tab != NumTab.comp) {
       text = sphereText(r.n, _sphere, text, easy: easy);
@@ -98,7 +98,7 @@ class _NumerologyScreenState extends State<NumerologyScreen> {
                 (NumTab.name, 'Число имени'),
                 (NumTab.day, 'Число дня'),
                 (NumTab.year, 'Личный год'),
-                (NumTab.comp, '💎 Совместимость'),
+                (NumTab.comp, 'Совместимость'),
               ])
                 ChoiceChip(
                   label: Text(label),
@@ -108,7 +108,7 @@ class _NumerologyScreenState extends State<NumerologyScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           if (_tab != NumTab.comp)
             Wrap(
               spacing: 6,
@@ -126,7 +126,7 @@ class _NumerologyScreenState extends State<NumerologyScreen> {
             ),
           if (_tab == NumTab.comp) ...[
             const Text('Дата рождения партнёра или подруги', style: TextStyle(color: AW.soft)),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             OutlinedButton.icon(
               icon: const Icon(Icons.calendar_month),
               label: Text(_date(_partner)),
@@ -156,12 +156,12 @@ class _NumerologyScreenState extends State<NumerologyScreen> {
               children: [
                 Text(
                   head,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AW.gold),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AW.gold),
                 ),
                 const SizedBox(height: 8),
                 Text(text, style: const TextStyle(height: 1.45)),
-                const SizedBox(height: 10),
-                Text(when, style: const TextStyle(color: AW.soft, fontSize: 12.5)),
+                const SizedBox(height: 12),
+                Text(when, style: const TextStyle(color: AW.soft, fontSize: 13)),
               ],
             ),
           ),
@@ -205,12 +205,12 @@ class _Calc extends StatelessWidget {
                     opacity: ((ms - i * 350) / 350).clamp(0.0, 1.0),
                     child: Text(
                       '${i > 0 ? ' → ' : ''}${steps[i]}',
-                      style: const TextStyle(color: AW.soft, fontSize: 13.5),
+                      style: const TextStyle(color: AW.soft, fontSize: 14),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Opacity(
               opacity: bigT,
               child: Transform.scale(
@@ -219,7 +219,7 @@ class _Calc extends StatelessWidget {
                   big,
                   style: const TextStyle(
                     fontSize: 64,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w500,
                     color: AW.gold,
                     shadows: [Shadow(color: Color(0x88F3C96B), blurRadius: 24)],
                   ),
@@ -230,7 +230,7 @@ class _Calc extends StatelessWidget {
               Text(
                 name,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: const TextStyle(fontWeight: FontWeight.w500),
               ),
           ],
         );

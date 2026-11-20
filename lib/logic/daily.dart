@@ -19,8 +19,6 @@ T pick<T>(List<T> list, String key) => list[stableHash(key) % list.length];
 
 String dayKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-String _easy(String s, String emoji) => '${s.replaceAll(RegExp(r'\.$'), '')} $emoji';
-
 class DayForecast {
   final String theme, love, work, mood, timing;
   final List<String> avoid, prepare;
@@ -61,10 +59,7 @@ DayForecast forecastFor(Profile p, DateTime date, {required bool easy, WitchAnsw
   };
   final k = '${p.name}|${p.birthday.toIso8601String().substring(0, 10)}|${p.birthSlot}|${dayKey(date)}';
   String g(String s) => genderize(s, female);
-  String two(String a, String b, String emoji) {
-    final s = g('$a $b');
-    return easy ? _easy(s, emoji) : s;
-  }
+  String two(String a, String b) => g('$a $b');
 
   final avoid1 = stableHash('${k}a') % 2 == 0 ? pick(avoidByMoon[moon], '${k}am') : pick(avoidByElement[el], '${k}ae');
   final prep1 = pick(prepareByDay[num], '${k}pd');
@@ -77,9 +72,9 @@ DayForecast forecastFor(Profile p, DateTime date, {required bool easy, WitchAnsw
   }
   return DayForecast(
     theme: '${pick(dayTheme[num], '${k}th')} · число $num',
-    love: two(pick(loveByElement[el], '${k}le'), pick(loveByMoon[moon], '${k}lm'), '💞'),
-    work: two(pick(workByElement[el], '${k}we'), pick(workByDay[num], '${k}wd'), '💼'),
-    mood: two(pick(moodBySun[sun], '${k}ms'), pick(moodBySlot[slot], '${k}mt'), '✨'),
+    love: two(pick(loveByElement[el], '${k}le'), pick(loveByMoon[moon], '${k}lm')),
+    work: two(pick(workByElement[el], '${k}we'), pick(workByDay[num], '${k}wd')),
+    mood: two(pick(moodBySun[sun], '${k}ms'), pick(moodBySlot[slot], '${k}mt')),
     timing: g(pick(timingBySlot[slot], '${k}ti')),
     avoid: [g(avoid1), g(pick(avoidCommon, '${k}ac'))],
     prepare: [g(prep1), g(pick(prepareCommon, '${k}pc'))],
@@ -93,51 +88,51 @@ enum SunEnergy { high, mid, low }
 SunEnergy sunEnergyFor(DateTime d) => SunEnergy.values[stableHash('${dayKey(d)}sun') % 3];
 
 String sunLevel(SunEnergy e) => switch (e) {
-  SunEnergy.high => '☀️ Высокая',
-  SunEnergy.mid => '🌤 Ровная',
-  SunEnergy.low => '⛅ Мягкая',
+  SunEnergy.high => 'Высокая',
+  SunEnergy.mid => 'Ровная',
+  SunEnergy.low => 'Мягкая',
 };
 
 const _sunText = {
   SunEnergy.high: [
     'День благоприятен для решительных шагов и публичных выступлений.',
-    'Солнце светит ярко — сегодня можно смело брать инициативу! ☀️',
+    'Солнце светит ярко, сегодня можно смело брать инициативу.',
   ],
   SunEnergy.mid: [
     'Энергия дня устойчивая: подходит для системной работы и завершения дел.',
-    'Ровный солнечный день: закрываем хвосты и не перегораем 🌤',
+    'Ровный солнечный день: закрываем хвосты и не перегораем.',
   ],
   SunEnergy.low: [
     'Активность снижена: лучше сосредоточиться на одном главном деле.',
-    'Солнце сегодня ленивое — и вам можно не геройствовать ⛅',
+    'Солнце сегодня ленивое, и вам можно не геройствовать.',
   ],
 };
 
 String sunText(SunEnergy e, {required bool easy}) => _sunText[e]![easy ? 1 : 0];
 
 String moonLevel(MoonPhase p) => switch (p) {
-  MoonPhase.newMoon => '🌑 Луна скрыта',
-  MoonPhase.young => '🌒 Растущая Луна',
-  MoonPhase.full => '🌕 Полнолуние',
-  MoonPhase.old => '🌘 Убывающая Луна',
+  MoonPhase.newMoon => 'Луна скрыта',
+  MoonPhase.young => 'Растущая Луна',
+  MoonPhase.full => 'Полнолуние',
+  MoonPhase.old => 'Убывающая Луна',
 };
 
 const _moonText = {
   MoonPhase.newMoon: [
     'Луна скрыта — день для внутреннего поиска и тихих намерений.',
-    'Луна спряталась — самое время побыть с собой 🌑',
+    'Луна спряталась, самое время побыть с собой.',
   ],
   MoonPhase.young: [
     'Эмоции на подъёме, легко загораться идеями; избегайте поспешных обещаний.',
-    'Луна растёт, и настроение тоже 🌒 Только не обещайте лишнего!',
+    'Луна растёт, и настроение тоже. Только не обещайте лишнего.',
   ],
   MoonPhase.full: [
     'Эмоциональная чувствительность повышена; избегайте поспешных выводов.',
-    'Луна сегодня шепчет: «не торопись». Прислушайтесь к себе 🌙',
+    'Луна сегодня шепчет: «не торопитесь». Прислушайтесь к себе.',
   ],
   MoonPhase.old: [
     'Время отпускать лишнее и завершать начатое; эмоции спокойнее.',
-    'Луна убывает — отпускаем всё лишнее 🌘',
+    'Луна убывает: отпускаем всё лишнее.',
   ],
 };
 
@@ -146,15 +141,15 @@ String moonText(MoonPhase p, {required bool easy}) => _moonText[p]![easy ? 1 : 0
 const _balance = {
   SunEnergy.high: [
     'Действуйте уверенно, но с учётом возможных рисков и эмоционального фона.',
-    'Смело шагайте вперёд, но держите внутренний тормоз включённым 💛',
+    'Смело шагайте вперёд, но держите внутренний тормоз включённым.',
   ],
   SunEnergy.mid: [
     'Сочетайте решительность с внимательностью к деталям и своему состоянию.',
-    'Смело шагайте, но не забывайте оглядываться 💛',
+    'Смело шагайте, но не забывайте оглядываться.',
   ],
   SunEnergy.low: [
     'Делайте главное в первой половине дня, вечер оставьте для отдыха.',
-    'Утром — дела, вечером — плед и чай ☕',
+    'Утром дела, вечером плед и чай.',
   ],
 };
 

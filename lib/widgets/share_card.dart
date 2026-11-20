@@ -39,13 +39,13 @@ class ShareCard extends StatelessWidget {
       // картинка всегда одного размера, без крупного шрифта и системного масштаба
       data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
       child: DefaultTextStyle.merge(
-        style: const TextStyle(color: AW.ink, fontSize: 14.5, height: 1.4, decoration: TextDecoration.none),
+        style: const TextStyle(color: AW.ink, fontSize: 15, height: 1.4, decoration: TextDecoration.none),
         child: Container(
           width: shareCardWidth,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AW.gold.withValues(alpha: 0.7), width: 1.5),
+            border: Border.all(color: AW.gold.withValues(alpha: 0.4)),
             gradient: const LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -86,14 +86,13 @@ class ShareCard extends StatelessWidget {
                             style: TextStyle(
                               color: AW.gold,
                               fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
+                              fontWeight: FontWeight.w500,
                               shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
                             ),
                           ),
                           Text(
                             'сонник · гороскоп · расклады',
-                            style: TextStyle(color: AW.soft, fontSize: 12.5, letterSpacing: 0.4),
+                            style: TextStyle(color: AW.soft, fontSize: 13),
                           ),
                         ],
                       ),
@@ -102,13 +101,13 @@ class ShareCard extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${c.emoji} ${c.title}',
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AW.ink),
+                      c.title,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500, color: AW.ink),
                     ),
                     if (c.subtitle != null)
                       Padding(
@@ -116,24 +115,19 @@ class ShareCard extends StatelessWidget {
                         child: Text(c.subtitle!, style: const TextStyle(color: AW.gold, fontSize: 14)),
                       ),
                     for (final s in c.sections) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       Text(
-                        s.title.toUpperCase(),
-                        style: const TextStyle(
-                          color: AW.gold,
-                          fontSize: 11.5,
-                          letterSpacing: 0.8,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        s.title,
+                        style: const TextStyle(color: AW.gold, fontSize: 13, fontWeight: FontWeight.w500),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 4),
                       Text(s.body),
                     ],
                     if (c.note != null) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       Text(
                         c.note!,
-                        style: const TextStyle(color: AW.soft, fontSize: 13, fontStyle: FontStyle.italic),
+                        style: const TextStyle(color: AW.soft, fontSize: 13),
                       ),
                     ],
                   ],
@@ -145,19 +139,19 @@ class ShareCard extends StatelessWidget {
                 color: AW.gold.withValues(alpha: 0.35),
               ),
               const Padding(
-                padding: EdgeInsets.fromLTRB(20, 10, 20, 16),
+                padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
                 child: Column(
                   children: [
                     Text(
-                      '✦ ${ShareContent.brand} ✦',
+                      ShareContent.brand,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AW.gold, fontSize: 12.5, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: AW.gold, fontSize: 13, fontWeight: FontWeight.w500),
                     ),
                     SizedBox(height: 2),
                     Text(
                       'Развлекательный характер',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AW.soft, fontSize: 10.5),
+                      style: TextStyle(color: AW.soft, fontSize: 11),
                     ),
                   ],
                 ),
@@ -224,7 +218,7 @@ class _SharePreviewState extends State<_SharePreview> {
       await ShareService.sender(png, widget.content.plainText);
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
-      if (mounted) setState(() => _error = 'Не получилось открыть меню «Поделиться». Попробуй ещё раз.');
+      if (mounted) setState(() => _error = 'Не получилось открыть меню «Поделиться». Попробуйте ещё раз.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -238,13 +232,13 @@ class _SharePreviewState extends State<_SharePreview> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Так увидят твои друзья', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const Text('Так увидят ваши друзья', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
             const Padding(
-              padding: EdgeInsets.fromLTRB(16, 2, 16, 10),
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
               child: Text(
                 'Имя, дата рождения и личные ответы на картинку не попадают.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AW.soft, fontSize: 12.5),
+                style: TextStyle(color: AW.soft, fontSize: 13),
               ),
             ),
             Flexible(

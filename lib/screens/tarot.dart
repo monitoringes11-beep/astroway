@@ -62,7 +62,7 @@ class _TarotScreenState extends State<TarotScreen> {
             showSelectedIcon: false,
             onSelectionChanged: (s) => setState(() => _three = s.first),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           if (!_three) ..._day() else ..._spreadView(),
           const SizedBox(height: 16),
           const Text(
@@ -87,7 +87,7 @@ class _TarotScreenState extends State<TarotScreen> {
       const SizedBox(height: 12),
       if (!_dayOpen)
         const Center(
-          child: Text('Нажми на карту, чтобы открыть', style: TextStyle(color: AW.soft)),
+          child: Text('Нажмите на карту, чтобы открыть', style: TextStyle(color: AW.soft)),
         )
       else
         GlassCard(
@@ -96,14 +96,14 @@ class _TarotScreenState extends State<TarotScreen> {
             children: [
               Text(
                 'Карта дня: ${c.name}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AW.gold),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AW.gold),
               ),
               const SizedBox(height: 8),
-              Text('${p.name}, сегодня с тобой ${c.name}: ${c.upright}.', style: const TextStyle(height: 1.4)),
+              Text('${p.name}, сегодня с вами ${c.name}: ${c.upright}.', style: const TextStyle(height: 1.4)),
               const SizedBox(height: 8),
               const Text(
                 'Карта одна на весь день. Завтра будет новая.',
-                style: TextStyle(color: AW.soft, fontSize: 12.5),
+                style: TextStyle(color: AW.soft, fontSize: 13),
               ),
               ShareButton(content: () => shareCardOfDay(c, DateTime.now())),
             ],
@@ -117,8 +117,8 @@ class _TarotScreenState extends State<TarotScreen> {
     final name = widget.app.profile!.name;
     final q = _question.text.trim();
     return [
-      const Text('Загадай вопрос (можно не писать, а просто подумать о нём)', style: TextStyle(color: AW.soft)),
-      const SizedBox(height: 6),
+      const Text('Загадайте вопрос (можно не писать, а просто подумать о нём)', style: TextStyle(color: AW.soft)),
+      const SizedBox(height: 8),
       TextField(
         controller: _question,
         decoration: const InputDecoration(hintText: 'Например: что ждёт меня в работе?'),
@@ -137,7 +137,7 @@ class _TarotScreenState extends State<TarotScreen> {
                   reversed: s?[i].reversed ?? false,
                   width: 96,
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(spreadPositions[i], style: const TextStyle(color: AW.soft, fontSize: 13)),
               ],
             ),
@@ -153,11 +153,11 @@ class _TarotScreenState extends State<TarotScreen> {
             children: [
               const Text(
                 'Толкование волшебницы',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AW.gold),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AW.gold),
               ),
               const SizedBox(height: 8),
               Text(
-                q.isEmpty ? '$name, вот что показали карты.' : '$name, твой вопрос: «$q».',
+                q.isEmpty ? '$name, вот что показали карты.' : '$name, ваш вопрос: «$q».',
                 style: const TextStyle(height: 1.4),
               ),
               const SizedBox(height: 8),
@@ -169,7 +169,7 @@ class _TarotScreenState extends State<TarotScreen> {
                       children: [
                         TextSpan(
                           text: '${spreadPositions[i]}: ${s[i].card.name}${s[i].reversed ? ' (перевёрнутая)' : ''}. ',
-                          style: const TextStyle(fontWeight: FontWeight.w700, color: AW.gold),
+                          style: const TextStyle(fontWeight: FontWeight.w500, color: AW.gold),
                         ),
                         TextSpan(text: '${capitalize(s[i].meaning)}.'),
                       ],
@@ -178,13 +178,13 @@ class _TarotScreenState extends State<TarotScreen> {
                   ),
                 ),
               Text(
-                'Совет волшебницы: опирайся на карту «${s[1].card.name}», она показывает, на чём сейчас твоя сила.',
-                style: const TextStyle(height: 1.4, fontWeight: FontWeight.w600),
+                'Совет волшебницы: опирайтесь на карту «${s[1].card.name}», она показывает, на чём сейчас ваша сила.',
+                style: const TextStyle(height: 1.4, fontWeight: FontWeight.w500),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               const Text(
                 'На тот же вопрос карты всегда отвечают одинаково. Вопрос про сегодня получит новый ответ завтра.',
-                style: TextStyle(color: AW.soft, fontSize: 12.5),
+                style: TextStyle(color: AW.soft, fontSize: 13),
               ),
               ShareButton(content: () => shareSpread(s)),
             ],
@@ -250,7 +250,7 @@ class TarotCard extends StatelessWidget {
                               card!.numeral,
                               style: TextStyle(
                                 color: const Color(0xFF2A1D05),
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w500,
                                 fontSize: width * 0.18,
                               ),
                             ),
@@ -263,7 +263,7 @@ class TarotCard extends StatelessWidget {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: const Color(0xFF2A1D05),
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w500,
                                 fontSize: width * 0.12,
                               ),
                             ),

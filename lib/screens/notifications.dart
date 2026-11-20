@@ -36,7 +36,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _block({
-    required String emoji,
+    required IconData icon,
     required String title,
     required String hint,
     required bool on,
@@ -50,10 +50,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         children: [
           Row(
             children: [
-              Text(emoji, style: const TextStyle(fontSize: 28)),
+              Icon(icon, size: 24, color: AW.soft),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
               ),
               Switch(value: on, onChanged: onToggle),
             ],
@@ -85,11 +85,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           _block(
-            emoji: '🔮',
+            icon: Icons.wb_sunny_outlined,
             title: 'Прогноз дня',
             hint: locked
                 ? 'Профиль с кодом входа: в уведомлении будет только «Прогноз дня готов», без личного текста.'
-                : 'Тема дня и настроение по твоему знаку — тот же прогноз, что на главном экране.',
+                : 'Тема дня и настроение по вашему знаку — тот же прогноз, что на главном экране.',
             on: s.forecastOn,
             minutes: s.forecastMinutes,
             onToggle: (v) => _save(s.copyWith(forecastOn: v)),
@@ -97,7 +97,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
           const SizedBox(height: 12),
           _block(
-            emoji: '🌕',
+            icon: Icons.bedtime_outlined,
             title: 'Смена фазы Луны',
             hint: 'Новолуние, растущая Луна, полнолуние, убывающая Луна — и подсказка, какой заговор подходит.',
             on: s.moonOn,
@@ -108,7 +108,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           const SizedBox(height: 16),
           const Text(
             'Уведомления ставятся прямо на телефоне, без интернета. Если Android их не показывает, '
-            'проверь в настройках телефона, что уведомления для AstroWay разрешены.',
+            'проверьте в настройках телефона, что уведомления для AstroWay разрешены.',
             style: TextStyle(color: AW.soft, fontSize: 13),
           ),
         ],

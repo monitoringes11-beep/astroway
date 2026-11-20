@@ -15,23 +15,23 @@ class ShareSection {
 /// Только общие толкования: без имени, даты рождения, возраста, ответов волшебнице,
 /// текста сна и вопроса к картам.
 class ShareContent {
-  final String emoji, title;
+  final String title;
   final String? subtitle;
   final List<ShareSection> sections;
   final String? note;
-  const ShareContent({required this.emoji, required this.title, this.subtitle, required this.sections, this.note});
+  const ShareContent({required this.title, this.subtitle, required this.sections, this.note});
 
   static const brand = 'AstroWay — сонник, гороскоп, расклады';
 
   /// Текст, который уходит вместе с картинкой (часть приложений берёт только его).
   String get plainText {
-    final b = StringBuffer('$emoji $title');
+    final b = StringBuffer(title);
     if (subtitle != null) b.write('\n$subtitle');
     for (final s in sections) {
       b.write('\n\n${s.title}\n${s.body}');
     }
     if (note != null) b.write('\n\n$note');
-    b.write('\n\n✦ $brand');
+    b.write('\n\n$brand');
     return b.toString();
   }
 }
@@ -66,12 +66,11 @@ String shorten(String s, [int max = 240]) {
 
 /// Прогноз дня: знак и дата, без имени и строки «Волшебница помнит».
 ShareContent shareForecast(DayForecast f, ZodiacSign sign, DateTime date) => ShareContent(
-  emoji: '🔮',
   title: 'Прогноз дня',
   subtitle: '${sign.symbol} ${sign.name} · ${shareDate(date)}',
   sections: [
     ShareSection('Тема дня', f.theme),
-    ShareSection('Что принесёт день', '💞 ${f.love}\n💼 ${f.work}\n✨ ${f.mood}'),
+    ShareSection('Что принесёт день', '${f.love}\n${f.work}\n${f.mood}'),
     ShareSection('Чего сторониться', f.avoid.map((e) => '• $e').join('\n')),
     ShareSection('К чему готовиться', f.prepare.map((e) => '• $e').join('\n')),
   ],
@@ -81,7 +80,6 @@ ShareContent shareForecast(DayForecast f, ZodiacSign sign, DateTime date) => Sha
 ShareContent shareDream(DreamReading r) {
   final syms = r.symbols.take(3).toList();
   return ShareContent(
-    emoji: '🌙',
     title: 'Толкование сна',
     subtitle: syms.isEmpty ? null : 'Образы: ${syms.map((s) => s.name.toLowerCase()).join(', ')}',
     sections: [for (final DreamSymbol s in syms) ShareSection('${s.name} · ${s.source}', shorten(s.classic))],
@@ -90,7 +88,6 @@ ShareContent shareDream(DreamReading r) {
 }
 
 ShareContent shareCardOfDay(Arcana c, DateTime date) => ShareContent(
-  emoji: '🃏',
   title: 'Карта дня',
   subtitle: shareDate(date),
   sections: [ShareSection('${c.numeral} · ${c.name}', '${capitalize(c.upright)}.')],
@@ -99,7 +96,6 @@ ShareContent shareCardOfDay(Arcana c, DateTime date) => ShareContent(
 
 /// Расклад на три карты без вопроса: вопрос — личное.
 ShareContent shareSpread(List<DrawnCard> s) => ShareContent(
-  emoji: '🃏',
   title: 'Расклад на три карты',
   subtitle: 'Прошлое · Настоящее · Будущее',
   sections: [
@@ -109,12 +105,11 @@ ShareContent shareSpread(List<DrawnCard> s) => ShareContent(
         '${capitalize(s[i].meaning)}.',
       ),
   ],
-  note: 'Совет: опирайся на карту «${s[1].card.name}», она показывает, на чём сейчас сила.',
+  note: 'Совет: опирайтесь на карту «${s[1].card.name}», она показывает, на чём сейчас сила.',
 );
 
 /// Итог по линиям ладони, без фото.
 ShareContent sharePalm(Map<String, String> answers, {required bool easy}) => ShareContent(
-  emoji: '✋',
   title: 'Тайны ладони',
   subtitle: 'Итог по всем линиям',
   sections: [
