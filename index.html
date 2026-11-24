@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v38</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v39</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -77,7 +77,8 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
       <div><label>Бесплатный ключ Groq (хранится только в этом браузере)</label>
         <input id="apiKey" type="password" placeholder="gsk_..."></div>
       <div><label>Язык отчёта</label>
-        <select id="reportLang"><option value="es">Español</option><option value="ru">Русский</option></select></div>
+        <div class="muted" style="font-size:13px;padding-top:6px">Разбор каждого звонка — сначала на испанском 🇪🇸, общий итог по всем звонкам и резюме стажёра — сначала на русском 🇷🇺. Второй язык — кнопкой над отчётом.</div>
+        <select id="reportLang" style="display:none"><option value="es">Español</option><option value="ru">Русский</option></select></div>
     </div>
     <div class="row" style="margin-top:10px">
       <div><label>Модель анализа</label>
@@ -561,7 +562,7 @@ const GLOBAL_RULES = `ЗАПРЕЩЕНО НА ВСЕХ ЛИНИЯХ: в нача
 ОБЯЗАТЕЛЬНО НА ВСЕХ ЛИНИЯХ: прежде чем попрощаться и поставить статус «Отказ», оператор должен отработать возражение клиента МИНИМУМ 2 раза. Посчитай, сколько раз оператор реально отработал возражения перед прощанием. Если меньше двух и клиент не бросил трубку сам — это грубая ошибка в "mistakes" (оператор сдался рано, возможный слив заказа): процитируй момент и дай 2 варианта отработки на языке звонка.
 `;
 async function analyze(turns, language, lang, line, result){
-  lang = lang || LS.get('reportLang','es'); const t = T[lang]; const L = LINES[line||'ol'];
+  lang = lang || 'es'; const t = T[lang]; const L = LINES[line||'ol'];
   const ctx = $('context').value ? `Оператор продаёт: ${$('context').value}.\n` : '';
   const resTxt = result==='ok' ? 'Оператор поставил этому звонку статус ПОДТВЕРЖДЕНИЕ (заказ подтверждён). Проверь, правильно ли это по правилам.\n' : result==='no' ? 'Оператор поставил этому звонку статус ОТКАЗ. Проверь, правильно ли это по правилам (не должен ли быть Дубль, Перезвон и т.п.) и не слил ли оператор заказ.\n' : '';
   let dlg = dialogText(turns, {O:'Оператор', C:'Клиент'}), condensed = false;
@@ -641,7 +642,7 @@ async function run(file, prefix, many){
     if(!segs.length) throw new Error('В записи не найдено речи.');
     const turns = await assignRoles(segs);
     let report = null;
-    const lang = LS.get('reportLang','es');
+    const lang = 'es'; // разбор каждого звонка — всегда сначала на испанском, русский по кнопке
     const line = $('line').value, result = $('crmres').value;
     try{ report = await analyze(turns, language, lang, line, result); }catch(e){ report = {error:e.message}; }
     current = {id:Date.now(), operator:opName(), line, result, name:file.name, date:new Date().toLocaleString('ru-RU'), language, turns, report, lang, reports:{[lang]:report}};
@@ -658,7 +659,7 @@ async function runMany(files){
   for(let i=0;i<files.length;i++) items.push(await run(files[i], `Звонок ${i+1} из ${files.length}: `, true));
   const ok = items.filter(x=>x && x.report && !x.report.error);
   if(!ok.length){ status('⚠️ Ни один звонок не удалось разобрать.',0); return; }
-  const lang = LS.get('reportLang','es');
+  const lang = 'ru'; // общий итог по всем звонкам — сначала на русском, испанский по кнопке
   const calls = ok.map(x=>({id:x.id, name:x.name, score:x.report.score, report:x.report}));
   const line = $('line').value; let report; try{ report = await summarize(calls, lang, line); }catch(e){ report = {error:e.message}; }
   current = {id:Date.now(), operator:opName(), line, multi:true, name:`Сводный разбор · ${ok.length} звонков`, date:new Date().toLocaleString('ru-RU'), calls, report, lang, reports:{[lang]:report}, turns:[]};
@@ -779,7 +780,7 @@ function render(c){
   $('result').classList.remove('hidden');
   document.querySelectorAll('[data-lang]').forEach(x=>x.classList.toggle('on', x.dataset.lang===lang));
   { const bes = document.querySelector('[data-lang=es]'), bru = document.querySelector('[data-lang=ru]');
-    if(c.trainee){ bru.textContent='🇷🇺 Русский'; bes.textContent='🇪🇸 Español (по желанию)'; bes.before(bru); }
+    if(c.trainee || c.multi){ bru.textContent='🇷🇺 Русский'; bes.textContent='🇪🇸 Español (по желанию)'; bes.before(bru); }
     else { bes.textContent='🇪🇸 Español'; bru.textContent='🇷🇺 Русский (по желанию)'; bru.before(bes); } }
   $('btnSwap').classList.toggle('hidden', !!(c.multi||c.trainee));
   document.querySelector('[data-tab=dialog]').textContent = (c.multi||c.trainee) ? 'Звонки' : 'Диалог';
