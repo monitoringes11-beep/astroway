@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v41</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v42</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -141,6 +141,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
     <div class="actions">
       <button class="primary" id="btnTrainee2" title="Выжимка по всем продажам и отказам этого оператора для супервайзеров">🎓 Резюме стажёра</button>
       <button id="btnCopy">📋 Копировать всё</button>
+      <button class="primary" id="btnWord" title="Один Word по всем звонкам: ошибки красным, правильные ответы зелёным">📄 Скачать Word</button>
       <button id="btnDownload">⬇️ Скачать .txt</button>
       <button id="btnSwap">🔄 Поменять роли местами</button>
       <button id="btnRedo" title="Заново разобрать по текущим правилам и скриптам продуктов">♻️ Разобрать заново</button>
@@ -920,6 +921,91 @@ $('btnDownload').onclick = () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([plainText(current)],{type:'text/plain;charset=utf-8'}));
   a.download = current.name.replace(/\.[^.]+$/,'')+(current.lang==='es'?'_analisis.txt':'_разбор.txt'); a.click();
+};
+
+/* ---------- Word (.docx) — собирается прямо в браузере ---------- */
+function zipStore(files){ // files: [{name, data:Uint8Array}] → Blob (zip без сжатия)
+  const crcT = zipStore.t || (zipStore.t = (()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })());
+  const crc = d => { let c=0xFFFFFFFF; for(let i=0;i<d.length;i++) c = crcT[(c^d[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; };
+  const enc = new TextEncoder(), parts=[], cen=[]; let off=0;
+  const u16=v=>[v&255,(v>>8)&255], u32=v=>[v&255,(v>>8)&255,(v>>16)&255,(v>>>24)&255];
+  files.forEach(f=>{ const nm=enc.encode(f.name), c=crc(f.data), sz=f.data.length;
+    const lh=new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(c),...u32(sz),...u32(sz),...u16(nm.length),...u16(0)]);
+    parts.push(lh,nm,f.data);
+    cen.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(c),...u32(sz),...u32(sz),...u16(nm.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]), nm);
+    off += lh.length+nm.length+sz; });
+  const cenLen = cen.reduce((a,b)=>a+b.length,0);
+  const end=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cenLen),...u32(off),...u16(0)]);
+  return new Blob([...parts,...cen,end],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+const DOCX_RED='B42318', DOCX_RED_BG='FDE4E1', DOCX_GREEN='0F7B3A', DOCX_GREEN_BG='DCF5E3';
+function docxBuild(paras){ // paras: [{runs:[{t,b,i,color,bg,size}], h:1|2|3, indent}]
+  const x = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const body = paras.map(p=>{
+    const sz = p.h===1?36 : p.h===2?28 : p.h===3?24 : 22;
+    const ppr = `<w:pPr><w:spacing w:before="${p.h?200:40}" w:after="${p.h?80:40}"/>${p.indent?`<w:ind w:left="${p.indent}"/>`:''}${p.bg?`<w:shd w:val="clear" w:color="auto" w:fill="${p.bg}"/>`:''}</w:pPr>`;
+    const runs = (p.runs||[]).map(r=>{ const rp = `<w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>${(r.b||p.h)?'<w:b/>':''}${r.i?'<w:i/>':''}${r.color?`<w:color w:val="${r.color}"/>`:''}${r.bg?`<w:shd w:val="clear" w:color="auto" w:fill="${r.bg}"/>`:''}<w:sz w:val="${r.size||sz}"/></w:rPr>`;
+      return String(r.t==null?'':r.t).split('\n').map((ln,k)=>`<w:r>${rp}${k?'<w:br/>':''}<w:t xml:space="preserve">${x(ln)}</w:t></w:r>`).join(''); }).join('');
+    return `<w:p>${ppr}${runs}</w:p>`; }).join('');
+  const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const ct = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
+  const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const e = new TextEncoder();
+  return zipStore([{name:'[Content_Types].xml',data:e.encode(ct)},{name:'_rels/.rels',data:e.encode(rels)},{name:'word/document.xml',data:e.encode(doc)}]);
+}
+function docxCall(P, r, lang, title){ // разбор одного звонка → абзацы
+  const t = T[lang||'es'], es = lang==='es';
+  const red = s => ({t:s, color:DOCX_RED, bg:DOCX_RED_BG}), green = s => ({t:s, color:DOCX_GREEN, bg:DOCX_GREEN_BG}), b = s => ({t:s, b:true});
+  P.push({h:2, runs:[{t:title}]});
+  if(!r || r.error){ P.push({runs:[red('⚠️ '+((r&&r.error)||'нет разбора'))]}); return; }
+  P.push({runs:[b(`${t.score}: ${r.score??'—'}/10   `), b(t.outcome+': '), {t:r.outcome||''}]});
+  if(r.sale) P.push({runs:[b('💶 '+(es?'Venta: ':'Продажа: ')), {t:r.sale}]});
+  if(r.status_audit && r.status_audit.correct) P.push({runs:[b((es?'Estado correcto: ':'Правильный статус: ')), r.status_audit.ok===false ? red(r.status_audit.correct+' ('+(es?'de hecho':'по факту')+': '+(r.status_audit.actual||'')+')') : {t:r.status_audit.correct}, ...(r.status_audit.reason?[{t:' — '+r.status_audit.reason, i:true}]:[])]});
+  if(r.summary){ P.push({h:3, runs:[{t:'📄 '+t.resume}]}); P.push({runs:[{t:r.summary}]}); }
+  if((r.strengths||[]).length){ P.push({h:3, runs:[{t:'✅ '+t.strengths, color:DOCX_GREEN}]}); r.strengths.forEach(s=>P.push({indent:300, runs:[green('• '+s)]})); }
+  const ms = r.mistakes||[];
+  P.push({h:3, runs:[{t:'❌ '+t.mistakes, color:DOCX_RED}]});
+  if(!ms.length) P.push({runs:[{t:t.noMistakes, i:true}]});
+  ms.forEach((m,i)=>{ if(typeof m==='string'){ P.push({indent:300, runs:[red('• '+m)]}); return; }
+    if(m.quote) P.push({indent:300, runs:[b(`${i+1}. `), red('«'+m.quote+'»')]});
+    if(m.problem) P.push({indent:500, runs:[{t:m.problem}]});
+    if(m.better) P.push({indent:500, runs:[b('➜ '+t.better+': '), green(m.better)]}); });
+  const ob = r.objections||[];
+  P.push({h:3, runs:[{t:'🛡️ '+t.objections}]});
+  if(!ob.length) P.push({runs:[{t:t.noObj, i:true}]});
+  ob.forEach((o,i)=>{ const bad = /^(плохо|частично|mal|parcial)/i.test(o.verdict||'');
+    P.push({indent:300, runs:[b(`${i+1}. ${es?'Cliente':'Клиент'}: `), {t:'«'+(o.objection||'')+'»'}]});
+    if(o.operator_response) P.push({indent:500, runs:[b(t.op+': '), bad ? red(o.operator_response) : {t:o.operator_response}, ...(o.verdict?[{t:'  ('+o.verdict+')', i:true}]:[])]});
+    if(o.better_response) P.push({indent:500, runs:[b('➜ '+t.strong+': '), green(o.better_response)]}); });
+  if((r.recommendations||[]).length){ P.push({h:3, runs:[{t:'💡 '+t.recs}]}); r.recommendations.forEach(s=>P.push({indent:300, runs:[{t:'• '+s}]})); }
+  if(r.script){ P.push({h:3, runs:[{t:'📝 '+t.script}]}); P.push({indent:300, runs:[green(r.script)]}); }
+}
+function makeDocx(c){
+  const P = [], lang = c.lang||'es', es = lang==='es';
+  const op = c.operator ? ` · ${c.operator}` : '';
+  P.push({h:1, runs:[{t:(c.multi? (es?'Análisis de llamadas':'Разбор звонков') : c.trainee ? (es?'Resumen del becario':'Резюме стажёра') : (es?'Análisis de la llamada':'Разбор звонка'))+op}]});
+  P.push({runs:[{t:c.date||'', i:true}]});
+  P.push({runs:[{t:es?'Leyenda: ':'Обозначения: ', b:true}, {t:es?' error del operador ':' ошибка оператора ', color:DOCX_RED, bg:DOCX_RED_BG}, {t:'   '}, {t:es?' cómo debería decirlo / buena respuesta ':' как надо было сказать / правильная отработка ', color:DOCX_GREEN, bg:DOCX_GREEN_BG}]});
+  if(c.multi || c.trainee){
+    const r = c.report||{}, t = T[lang];
+    if(c.multi && r.overview){ P.push({h:2, runs:[{t:'📋 '+t.overall}]}); P.push({runs:[{t:r.overview}]});
+      (r.recurring_mistakes||[]).forEach(m=>{ P.push({indent:300, runs:[{t:'• ', b:true}, {t:m.mistake||'', color:DOCX_RED, bg:DOCX_RED_BG}, ...(m.where?[{t:' ('+m.where+')', i:true}]:[])]}); if(m.phrase||m.fix) P.push({indent:500, runs:[{t:'➜ ', b:true}, {t:[m.fix,m.phrase&&('«'+m.phrase+'»')].filter(Boolean).join(' '), color:DOCX_GREEN, bg:DOCX_GREEN_BG}]}); });
+      if((r.priorities||[]).length){ P.push({h:3, runs:[{t:es?'🎯 Prioridades':'🎯 Приоритеты'}]}); r.priorities.forEach(s=>P.push({indent:300, runs:[{t:'• '+s}]})); } }
+    if(c.trainee && r.strengths){ P.push({h:2, runs:[{t:'✅ '+(es?'Puntos fuertes':'Сильные стороны'), color:DOCX_GREEN}]}); P.push({runs:[{t:r.strengths}]}); P.push({h:2, runs:[{t:'📚 '+(es?'Qué debe reforzar':'Что нужно доучить'), color:DOCX_RED}]}); P.push({runs:[{t:r.to_learn||''}]}); }
+    const hist = LS.get('history',[]);
+    (c.calls||[]).forEach((cc,i)=>{ const h = hist.find(x=>x.id===cc.id) || {}; const cl = h.lang || 'es';
+      const rep = (h.reports && h.reports[cl]) || cc.report || h.report;
+      docxCall(P, rep, cl, `${i+1}. ${cc.name||h.name||''}${(LINES[cc.line||h.line]||{}).short?' · '+LINES[cc.line||h.line].short:''}${RES[cc.result||h.result]?' · '+RES[cc.result||h.result][cl]:''}`); });
+  } else docxCall(P, c.report, lang, `${c.name||''}${(LINES[lineOf(c)]||{}).short?' · '+LINES[lineOf(c)].short:''}${RES[c.result]?' · '+RES[c.result][lang]:''}`);
+  return docxBuild(P);
+}
+$('btnWord').onclick = () => {
+  if(!current) return;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(makeDocx(current));
+  const base = (current.multi||current.trainee) ? ((current.operator||'operador')+'_'+(current.calls||[]).length+(current.lang==='es'?'_llamadas':'_звонков')) : current.name.replace(/\.[^.]+$/,'');
+  a.download = base.replace(/[\\/:*?"<>|]+/g,'_') + (current.lang==='es'?'_analisis.docx':'_разбор.docx');
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(a.href); }, 2000);
+  status(current.lang==='es'?'Word descargado.':'Word скачан.',100);
 };
 
 /* ---------- history ---------- */
