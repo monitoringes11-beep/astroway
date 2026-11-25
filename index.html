@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v42</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v43</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -141,7 +141,8 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
     <div class="actions">
       <button class="primary" id="btnTrainee2" title="Выжимка по всем продажам и отказам этого оператора для супервайзеров">🎓 Резюме стажёра</button>
       <button id="btnCopy">📋 Копировать всё</button>
-      <button class="primary" id="btnWord" title="Один Word по всем звонкам: ошибки красным, правильные ответы зелёным">📄 Скачать Word</button>
+      <button class="primary" id="btnAllWord2" title="Один файл Word: разбор всех звонков этого оператора подряд и итоговое резюме в конце">📄 Один Word на все звонки</button>
+      <button id="btnWord" title="Word только с тем, что открыто сейчас">📄 Word этого звонка</button>
       <button id="btnDownload">⬇️ Скачать .txt</button>
       <button id="btnSwap">🔄 Поменять роли местами</button>
       <button id="btnRedo" title="Заново разобрать по текущим правилам и скриптам продуктов">♻️ Разобрать заново</button>
@@ -149,7 +150,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
   </div>
 
   <div class="card hidden" id="historyCard">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><h2 id="historyTitle" style="margin:0">Звонки оператора</h2><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="primary" id="btnTrainee" title="Выжимка по всем продажам и отказам для группы супервайзеров">🎓 Резюме стажёра</button><button id="btnClearMine">🗑 Удалить звонки оператора</button></span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><h2 id="historyTitle" style="margin:0">Звонки оператора</h2><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="primary" id="btnAllWord" title="Один файл Word: разбор всех звонков этого оператора подряд и итоговое резюме в конце">📄 Один Word на все звонки</button><button class="primary" id="btnTrainee" title="Выжимка по всем продажам и отказам для группы супервайзеров">🎓 Резюме стажёра</button><button id="btnClearMine">🗑 Удалить звонки оператора</button></span></div>
     <div class="hist" id="history"></div>
   </div>
 
@@ -483,7 +484,7 @@ function rulesBlock(){
   return (r ? `\nПРАВИЛА КОМПАНИИ (обязательны). Нарушение правила оператором — это ошибка: укажи её в mistakes со ссылкой на правило. Все советы, «better», «best_response», «phrase» и «script» должны строго соблюдать эти правила (никогда не предлагай то, что они запрещают):\n${r}\n` : '') + `\n${NO_INFO_RULE}\n`;
 }
 const LINES = {
-  ol:{name:'Общая линия (ОЛ, первая линия)', short:'ОЛ',
+  ol:{name:'Общая линия (ОЛ, первая линия)', short:'ОЛ', esShort:'Línea general',
     ru:'Приветствие|Выявление потребностей|Фраза-мост к презентации|Презентация продукта|Фраза-мост к цене|Цена: два курса, начиная с дорогого|Фраза-мост к возражениям|Работа с возражениями|Результат (продажа или отказ)',
     es:'Saludo|Detección de necesidades|Frase puente a la presentación|Presentación del producto|Frase puente al precio|Precio: dos cursos, empezando por el más caro|Frase puente a las objeciones|Manejo de objeciones|Resultado (venta o rechazo)',
     rules:`Звонок общей линии (ОЛ, первая линия). Этапы продаж строго в таком порядке: 1) приветствие; 2) выявление потребностей; 3) фраза-«мост» к следующему этапу; 4) презентация продукта; 5) фраза-«мост»; 6) произнесение цены, начиная с высокой, демонстрируя ДВА курса, чтобы клиент выбрал один из них; 7) фраза-«мост»; 8) работа с возражениями; 9) результат — продажа или отказ. Проверь наличие каждой фразы-«моста» между этапами; пропущенный мост или этап — ошибка. Цена показывается двумя курсами на выбор.
@@ -502,7 +503,7 @@ const LINES = {
 СЛИВ ЗАКАЗА (грубое нарушение): клиента слышно, а оператор молчит или не перезвонил; оператор сам завершает звонок без уважительной причины («вас не слышно» и сброс, фиктивный перезвон); оператор предлагает перезвон, хотя клиент не просил; связь прервалась, а оператор не перезвонил; оператор хамит клиенту.
 Слова-ловушки (если они есть — допустим только валидный статус: отказ или подтверждён, невалид запрещён): было выявление потребностей (больше 3 вопросов о симптомах) и следующие этапы; вопросы клиента о цене («Сколько стоит?», «Точно бесплатно?»); любые возражения и сомнения, в т.ч. о качестве («Это не подделка?»); мат/претензии клиента; оператор произнёс «курс», «комплект», «набор», «приобретаете/покупаете/оплачиваете», «бесплатно», «за 20 евро».
 Статусы отказа (выбери подходящий): Отказ; Бросил трубку и не отвечает; Закажу потом — нужно посоветоваться; Пробовал много продуктов / купил другой; Не заказывал; Закажу потом — уезжаю; Негативные отзывы; Хочет 1 уп.; Сброс на цене; Противопоказание (аллергия, беременность/кормление). Невалидные: Передумал сразу (звонок не дольше 40 сек), Не заказывал (3-е лицо), Заказан у конкурентов (уточнить упаковки, сумму, другой номер и всё равно провести презентацию и продажу — мы единственные продавцы оригинала), Языковой барьер, Хамство/спам, Дубль (тот же товар и номер в течение 30 дней), Консультация, Нет доставки.`, regs:true},
-  base:{name:'Вторая линия, группа «База»', short:'База',
+  base:{name:'Вторая линия, группа «База»', short:'База', esShort:'Base',
     ru:'Приветствие|Работа с возражениями (если есть)|Выявление потребностей и самочувствия|Презентация: результаты и на что влияет продукт|Цена: от высокого курса вниз',
     es:'Saludo|Manejo de objeciones (si las hay)|Detección de necesidades y cómo se siente|Presentación: resultados y en qué influye el producto|Precio: del curso más alto hacia abajo',
     rules:`Звонок второй линии, группа «База». Этапы продаж строго в таком порядке: 1) приветствие; 2) работа с возражениями, если они есть; 3) выявление потребностей — уточнить, как клиент себя чувствует; 4) небольшая презентация продукта: какие результаты получит клиент и на что продукт влияет; 5) подача цены — начинать с более высокого курса и, отрабатывая возражения, постепенно спускаться. Норма группы «База»: средний чек дня 125 €, минимальная продажа 105 € — продажа ниже 105 € является ошибкой, продажа ниже 125 € — повод проверить, не спустился ли оператор слишком быстро.
@@ -515,7 +516,7 @@ const LINES = {
 ПЕРЕЗВОН: только с ясного согласия клиента и ДО любой информации о продукте, когда клиенту неудобно или он просит перезвонить позже; в течение 24 часов (на второй день работы оператора — только на тот же день). Запрещено: оставлять перезвоны другой группе; использовать перезвон для скрытых отказов или «догонов»; ставить перезвон, если разговора не было. Если продукт, бонусы или любая коммерческая информация уже прозвучали и клиент просит перезвонить — это ОТКАЗ (оператор записывает номер карточки и перезванивает сам).
 РУЧНОЙ НАБОР: отказ от перезвона, активация купона или новый заказ по просьбе клиента.
 ОТЛОЖЕННАЯ ДОСТАВКА (более 4 дней; это только про дату ДОСТАВКИ уже проданного заказа, а не про перезвон — перезвон дальше 24 часов запрещён): согласовать сумму, продукты и упаковки, записать адрес; при постобработке — заказ в Отказ, комментарий «Не трогать, этот заказ [имя оператора]», телефония «Не звонить»; при повторном подтверждении — ссылка от СВ, звонок клиенту, при «да» СВ подтверждает заказ на оператора.`},
-  fiz:{name:'Вторая линия, группа «Физика»', short:'Физика',
+  fiz:{name:'Вторая линия, группа «Физика»', short:'Физика', esShort:'Física',
     ru:'Приветствие|Работа с возражениями (если есть)|Выявление потребностей и самочувствия|Презентация: результаты и на что влияет продукт|Цена: от высокого курса вниз',
     es:'Saludo|Manejo de objeciones (si las hay)|Detección de necesidades y cómo se siente|Presentación: resultados y en qué influye el producto|Precio: del curso más alto hacia abajo',
     rules:`Звонок второй линии, группа «Физика». Этапы продаж строго в таком порядке: 1) приветствие; 2) работа с возражениями, если они есть; 3) выявление потребностей — уточнить, как клиент себя чувствует; 4) небольшая презентация продукта: какие результаты получит клиент и на что продукт влияет; 5) подача цены — начинать с более высокого курса и, отрабатывая возражения, постепенно спускаться. Норма группы «Физика»: средний чек дня 110 €, минимальная продажа 95 € — продажа ниже 95 € является ошибкой, продажа ниже 110 € — повод проверить, не спустился ли оператор слишком быстро.
@@ -528,7 +529,7 @@ const LINES = {
 ПЕРЕЗВОН: только с ясного согласия клиента и ДО любой информации о продукте, когда клиенту неудобно или он просит перезвонить позже; в течение 24 часов (на второй день работы оператора — только на тот же день). Запрещено: оставлять перезвоны другой группе; использовать перезвон для скрытых отказов или «догонов»; ставить перезвон, если разговора не было. Если продукт, бонусы или любая коммерческая информация уже прозвучали и клиент просит перезвонить — это ОТКАЗ (оператор записывает номер карточки и перезванивает сам).
 РУЧНОЙ НАБОР: отказ от перезвона, активация купона или новый заказ по просьбе клиента.
 ОТЛОЖЕННАЯ ДОСТАВКА (более 4 дней; это только про дату ДОСТАВКИ уже проданного заказа, а не про перезвон — перезвон дальше 24 часов запрещён): согласовать сумму, продукты и упаковки, записать адрес; при постобработке — заказ в Отказ, комментарий «Не трогать, этот заказ [имя оператора]», телефония «Не звонить»; при повторном подтверждении — ссылка от СВ, звонок клиенту, при «да» СВ подтверждает заказ на оператора.`},
-  in:{name:'Входящая линия (Línea entrante UE)', short:'Входящая',
+  in:{name:'Входящая линия (Línea entrante UE)', short:'Входящая', esShort:'Línea entrante',
     ru:'Приветствие по скрипту и имя клиента|Статус заказа и причина звонка|Работа с возражениями (минимум 3 попытки)|Продажа / увеличение заказа (2 программы с большей, +1 коробка, доп. продукт)|Проверка данных (ФИО, адрес с индексом, состав и сумма)|Договор-оферта и чёткое «да»|Завершение подтверждением и прощание',
     es:'Saludo según el guion y nombre del cliente|Estado del pedido y motivo de la llamada|Manejo de objeciones (mínimo 3 intentos)|Venta / subir el ticket (2 programas desde el mayor, +1 caja, producto adicional)|Comprobación de datos (nombre, dirección con CP, contenido e importe)|Contrato de oferta y «sí» claro|Cierre con confirmación y despedida',
     checks:'1 приветствие по скрипту и спросил имя клиента; 2 открыл карточку и правильно увидел статус заказа; 3 понял причину звонка / отказа; 4 отработал возражение аргументами (результат, продукт, акция, истории); 5 не сдался после первого «нет» (минимум 3 попытки); 6 проверил ФИО по слогам; 7 проверил полный адрес с почтовым индексом; 8 проверил состав и назвал итоговую сумму; 9 предупредил: точная сумма наличными, без сдачи; 10 предложил 2 программы с большей и молча ждал; 11 пытался поднять чек (+1 коробка / цена за коробку / программа по проблеме); 12 кросс-продажа по потребности клиента до итоговой суммы; 13 договор-оферта + чёткое «да»; 14 не назвал точное время доставки; 15 не отправлял информацию в WhatsApp/другие каналы; 16 закончил подтверждением и прощанием; 17-20 комментарий, кнопка, статус, Touchpoint/чат — оцени по разговору, если видно (иначе null)',
@@ -583,6 +584,28 @@ const GLOBAL_RULES = `ЗАПРЕЩЕНО НА ВСЕХ ЛИНИЯХ (в любо
 
 ОБЯЗАТЕЛЬНО НА ВСЕХ ЛИНИЯХ: прежде чем попрощаться и поставить статус «Отказ», оператор должен отработать возражение клиента МИНИМУМ 2 раза. Посчитай, сколько раз оператор реально отработал возражения перед прощанием. Если меньше двух и клиент не бросил трубку сам — это грубая ошибка в "mistakes" (оператор сдался рано, возможный слив заказа): процитируй момент и дай 2 варианта отработки на языке звонка.
 `;
+/* ---------- разбор на испанском: без русских вставок ---------- */
+const CYR = /[А-Яа-яЁё]/;
+async function fixSpanish(rep){
+  if(!rep || rep.error) return rep;
+  const items = [];
+  (function walk(o){ if(Array.isArray(o)) o.forEach((v,i)=>{ if(typeof v==='string'){ if(CYR.test(v)) items.push([o,i]); } else if(v&&typeof v==='object') walk(v); });
+    else if(o && typeof o==='object') Object.keys(o).forEach(k=>{ const v=o[k]; if(typeof v==='string'){ if(CYR.test(v)) items.push([o,k]); } else if(v&&typeof v==='object') walk(v); }); })(rep);
+  if(!items.length) return rep;
+  status('Перевожу русские вставки в разборе на испанский…', 97);
+  const groups = []; let cur = [], len = 0;
+  items.forEach(it => { const l = String(it[0][it[1]]).length; if(cur.length && len + l > 4500){ groups.push(cur); cur=[]; len=0; } cur.push(it); len += l; });
+  if(cur.length) groups.push(cur);
+  for(const g of groups){
+    const src = g.map(([o,k])=>o[k]);
+    try{
+      const r = await chatJSON(`Ты переводчик разборов звонков для стажёров колл-центра в Испании. Тебе дают массив строк, в которых есть русский текст. Переведи КАЖДУЮ строку полностью на испанский (Испания): русские слова и фразы переведи, испанские части (цитаты, готовые фразы) оставь как есть. Термины: «Отказ» = «Rechazo», «Подтверждение» = «Confirmado», «Перезвон» = «Rellamada», «Дубль» = «Duplicado», «ОЛ» = «línea general». Ничего не добавляй и не сокращай.
+Верни JSON: {"t":["перевод 1","перевод 2", ...]} — ровно ${src.length} строк в том же порядке.`, JSON.stringify(src), {small:true, max:Math.min(4000, Math.ceil(src.join('').length/2)+400)});
+      if(Array.isArray(r.t) && r.t.length===src.length) g.forEach(([o,k],i)=>{ if(typeof r.t[i]==='string' && r.t[i].trim()) o[k] = r.t[i]; });
+    }catch(e){}
+  }
+  return rep;
+}
 async function analyze(turns, language, lang, line, result){
   lang = lang || 'es'; const t = T[lang]; const L = LINES[line||'ol'];
   const ctx = $('context').value ? `Оператор продаёт: ${$('context').value}.\n` : '';
@@ -652,6 +675,7 @@ ${prods.length?`"product_check":{"product":"какой продукт обсуж
     }catch(e){}
   }
   if(prods.length && rep.product_check && !rep.product_check.product) rep.product_check.product = prods.join(', ');
+  if(lang==='es') await fixSpanish(rep);
   return rep;
 }
 
@@ -816,7 +840,7 @@ function render(c){
   $('tab-report').innerHTML = `
     <div class="row" style="align-items:center">
       <div style="flex:0 0 auto"><div class="score">${esc(r.score??'—')}<span class="muted" style="font-size:16px">/10</span></div></div>
-      <div><span class="pill">${esc(LINES[lineOf(c)].short)}</span>${resPill(c,lang)} <b>${t.outcome}:</b> ${esc(r.outcome)}${r.sale?`<br><b>💶 ${lang==='es'?'Venta':'Продажа'}:</b> ${esc(r.sale)}`:''}${r.check_note?`<br><span class="muted">${esc(r.check_note)}</span>`:''}${r.status_audit&&r.status_audit.correct?`<br><b class="${r.status_audit.ok===false?'bad':''}">${r.status_audit.ok===false?'⚠️':'🏷️'} ${lang==='es'?'Estado correcto':'Правильный статус'}: ${esc(r.status_audit.correct)}</b>${r.status_audit.ok===false?` <span class="muted">(${lang==='es'?'de hecho':'по факту'}: ${esc(r.status_audit.actual)})</span>`:''}${r.status_audit.reason?`<br><span class="muted">${esc(r.status_audit.reason)}</span>`:''}`:''}${r.crm_status?`<br><b>🏷️ ${lang==='es'?'Estado en CRM':'Статус в CRM'}:</b> ${esc(r.crm_status)}`:''}${r.drain&&!/^(нет|no)\b/i.test(r.drain)?`<br><b class="bad">⚠️ ${lang==='es'?'Pérdida del pedido':'Слив заказа'}:</b> ${esc(r.drain)}`:''}${r.trap_words&&!/^(нет|no)\b/i.test(r.trap_words)?`<br><span class="muted">${lang==='es'?'Palabras trampa':'Слова-ловушки'}: ${esc(r.trap_words)}</span>`:''}</div>
+      <div><span class="pill">${esc(lang==='es'&&LINES[lineOf(c)].esShort||LINES[lineOf(c)].short)}</span>${resPill(c,lang)} <b>${t.outcome}:</b> ${esc(r.outcome)}${r.sale?`<br><b>💶 ${lang==='es'?'Venta':'Продажа'}:</b> ${esc(r.sale)}`:''}${r.check_note?`<br><span class="muted">${esc(r.check_note)}</span>`:''}${r.status_audit&&r.status_audit.correct?`<br><b class="${r.status_audit.ok===false?'bad':''}">${r.status_audit.ok===false?'⚠️':'🏷️'} ${lang==='es'?'Estado correcto':'Правильный статус'}: ${esc(r.status_audit.correct)}</b>${r.status_audit.ok===false?` <span class="muted">(${lang==='es'?'de hecho':'по факту'}: ${esc(r.status_audit.actual)})</span>`:''}${r.status_audit.reason?`<br><span class="muted">${esc(r.status_audit.reason)}</span>`:''}`:''}${r.crm_status?`<br><b>🏷️ ${lang==='es'?'Estado en CRM':'Статус в CRM'}:</b> ${esc(r.crm_status)}`:''}${r.drain&&!/^(нет|no)\b/i.test(r.drain)?`<br><b class="bad">⚠️ ${lang==='es'?'Pérdida del pedido':'Слив заказа'}:</b> ${esc(r.drain)}`:''}${r.trap_words&&!/^(нет|no)\b/i.test(r.trap_words)?`<br><span class="muted">${lang==='es'?'Palabras trampa':'Слова-ловушки'}: ${esc(r.trap_words)}</span>`:''}</div>
     </div>
     <h3>📄 ${t.resume}</h3><div class="item">${esc(r.summary)}</div>
     ${r.product_check?`<h3>📦 ${lang==='es'?'Producto según el guion':'Продукт по скрипту'}: ${esc(r.product_check.product||'')}</h3>${r.product_check.presentation?`<p>${esc(r.product_check.presentation)}</p>`:''}${(r.product_check.used||[]).length?`<b class="good">${lang==='es'?'Usó del guion (punto a favor)':'Сказал по скрипту (плюс)'}:</b>${list(r.product_check.used)}`:''}${(r.product_check.missed||[]).length?`<b>${lang==='es'?'Faltó':'Пропущено'}:</b>${list(r.product_check.missed)}`:''}${(r.product_check.wrong||[]).length?`<b class="bad">${lang==='es'?'Incorrecto / prohibido':'Неверно / запрещено'}:</b>${list(r.product_check.wrong)}`:''}`:''}
@@ -1026,36 +1050,67 @@ function makeDocx(c){
   P.push({h:1, runs:[{t:(grp ? 'Разбор звонков' : (es?'Análisis de la llamada':'Разбор звонка'))+op}]});
   P.push({runs:[{t:c.date||'', i:true}]});
   if(grp) P.push({runs:[{t:`Звонков: ${(c.calls||[]).length}. Сначала разбор каждого звонка (на испанском), в конце — итоговое резюме по всем звонкам (на русском).`}]});
-  P.push({runs:[{t:es&&!grp?'Leyenda: ':'Обозначения: ', b:true}, {t:es&&!grp?' error del operador ':' ошибка оператора ', color:DOCX_RED, bg:DOCX_RED_BG}, {t:'   '}, {t:es&&!grp?' cómo debería decirlo / buena respuesta ':' как надо было сказать / правильная отработка ', color:DOCX_GREEN, bg:DOCX_GREEN_BG}]});
+  P.push({runs:[{t:grp?'Leyenda / Обозначения: ':es?'Leyenda: ':'Обозначения: ', b:true}, {t:grp?' error del operador / ошибка ':es?' error del operador ':' ошибка оператора ', color:DOCX_RED, bg:DOCX_RED_BG}, {t:'   '}, {t:grp?' cómo debería decirlo / как надо ':es?' cómo debería decirlo / buena respuesta ':' как надо было сказать / правильная отработка ', color:DOCX_GREEN, bg:DOCX_GREEN_BG}]});
   if(grp){
     const hist = LS.get('history',[]);
     (c.calls||[]).forEach((cc,i)=>{ const h = hist.find(x=>x.id===cc.id) || {}; const cl = h.lang || 'es';
       const rep = (h.reports && h.reports[cl]) || cc.report || h.report;
-      docxCall(P, rep, cl, `${i+1}. ${cc.name||h.name||''}${(LINES[cc.line||h.line]||{}).short?' · '+LINES[cc.line||h.line].short:''}${RES[cc.result||h.result]?' · '+RES[cc.result||h.result][cl]:''}`); });
+      docxCall(P, rep, cl, `${i+1}. ${cc.name||h.name||''}${(LINES[cc.line||h.line]||{}).short?' · '+(cl==='es'&&LINES[cc.line||h.line].esShort||LINES[cc.line||h.line].short):''}${RES[cc.result||h.result]?' · '+RES[cc.result||h.result][cl]:''}`); });
     docxFinal(P, c);
-  } else docxCall(P, c.report, lang, `${c.name||''}${(LINES[lineOf(c)]||{}).short?' · '+LINES[lineOf(c)].short:''}${RES[c.result]?' · '+RES[c.result][lang]:''}`);
+  } else docxCall(P, c.report, lang, `${c.name||''}${(LINES[lineOf(c)]||{}).short?' · '+(es&&LINES[lineOf(c)].esShort||LINES[lineOf(c)].short):''}${RES[c.result]?' · '+RES[c.result][lang]:''}`);
   return docxBuild(P);
 }
 async function ensureFinal(c){ // для Word: итог по звонкам и резюме стажёра делаются сами, без отдельных кнопок
   const hist = LS.get('history',[]);
   const calls = (c.calls||[]).map(x=>{ const h = hist.find(y=>y.id===x.id)||{}; return {...x, result:x.result||h.result, line:x.line||h.line}; });
   let changed = false;
+  for(const x of calls){ const h = hist.find(y=>y.id===x.id); const rep = h && h.reports && h.reports.es;
+    if(rep && CYR.test(JSON.stringify(rep))){ await fixSpanish(rep); h.report = h.lang==='es' ? rep : h.report; saveHistory(h); const cc = (c.calls||[]).find(y=>y.id===x.id); if(cc) cc.report = rep; } }
   if(c.trainee && !c.traineeRep){ const tr = (c.reports&&c.reports.ru) || c.report; if(tr && !tr.error){ c.traineeRep = tr; changed = true; } }
   if(!c.traineeRep){ status('Word: готовлю резюме оператора (сильные стороны и что доучить)…', 60); try{ c.traineeRep = await traineeSummary({...c, calls}, 'ru'); changed = true; }catch(e){} }
   if(c.trainee && !c.summaryRep){ status('Word: готовлю итог по всем звонкам…', 80); try{ c.summaryRep = await summarize(calls, 'ru', lineOf(c)); changed = true; }catch(e){} }
   if(changed) saveHistory(c);
 }
+function downloadDocx(c){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(makeDocx(c));
+  const grp = c.multi||c.trainee;
+  const base = grp ? ((c.operator||'оператор')+'_'+(c.calls||[]).length+'_звонков') : c.name.replace(/\.[^.]+$/,'');
+  a.download = base.replace(/[\\/:*?"<>|]+/g,'_') + (grp||c.lang!=='es'?'_разбор.docx':'_analisis.docx');
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(a.href); }, 2000);
+}
 $('btnWord').onclick = async () => {
   if(!current) return;
   const btn = $('btnWord'); btn.disabled = true;
   try{ if(current.multi||current.trainee) await ensureFinal(current); } finally { btn.disabled = false; }
-  const a = document.createElement('a'); a.href = URL.createObjectURL(makeDocx(current));
-  const grp = current.multi||current.trainee;
-  const base = grp ? ((current.operator||'оператор')+'_'+(current.calls||[]).length+'_звонков') : current.name.replace(/\.[^.]+$/,'');
-  a.download = base.replace(/[\\/:*?"<>|]+/g,'_') + (grp||current.lang!=='es'?'_разбор.docx':'_analisis.docx');
-  document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(a.href); }, 2000);
+  downloadDocx(current);
   status(current.lang==='es'?'Word descargado.':'Word скачан.',100);
 };
+// ОДИН Word на все звонки оператора: все разборы подряд + итоговое резюме в конце
+async function allWord(){
+  const op = opName();
+  const calls = LS.get('history',[]).filter(x => (x.operator||'Без имени')===op && !x.multi && !x.trainee && x.report && !x.report.error)
+    .slice(0, 30).reverse().map(x => ({id:x.id, name:x.name, score:x.report.score, report:(x.reports&&x.reports.es)||x.report, result:x.result, line:x.line}));
+  if(!calls.length){ status('⚠️ У этого оператора пока нет разобранных звонков. Сначала загрузите звонки.', 0); return; }
+  const btns = [$('btnAllWord'), $('btnAllWord2')]; btns.forEach(x=>x.disabled=true);
+  try{
+    const key = calls.map(x=>x.id).join(',');
+    // если итог по этим же звонкам уже делали — берём готовый, лимиты не тратим
+    let c = LS.get('history',[]).find(x => x.multi && (x.operator||'Без имени')===op && (x.calls||[]).map(y=>y.id).join(',')===key && x.report && !x.report.error);
+    if(!c){
+      status(`Один Word: готовлю итог по ${calls.length} звонкам…`, 50);
+      const line = calls[calls.length-1].line || $('line').value; let report;
+      try{ report = await summarize(calls, 'ru', line); }catch(e){ report = {error:e.message}; }
+      c = {id:Date.now(), operator:op, line, multi:true, name:`Сводный разбор · ${calls.length} звонков`, date:new Date().toLocaleString('ru-RU'), calls, report, lang:'ru', reports:{ru:report}, turns:[]};
+    }
+    c.lang = 'ru'; c.report = (c.reports&&c.reports.ru) || c.report;
+    await ensureFinal(c); saveHistory(c);
+    current = c; render(c); renderHistory();
+    downloadDocx(c);
+    status(`Готово: скачан один Word на ${calls.length} звонков (разбор каждого + итоговое резюме в конце).`, 100);
+  } finally { btns.forEach(x=>x.disabled=false); }
+}
+$('btnAllWord').onclick = allWord;
+$('btnAllWord2').onclick = () => { if(current && current.operator){ $('operator').value = current.operator; LS.set('operator', current.operator); } allWord(); };
 
 /* ---------- history ---------- */
 function saveHistory(c){
