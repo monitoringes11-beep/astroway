@@ -387,16 +387,22 @@ async function chatJSON(system, user, opt){
 
 /* ---------- audio: split big files into 16kHz mono WAV chunks ---------- */
 const MAX_BYTES = 24*1024*1024, CHUNK_SEC = 600;
-async function splitAudio(file){
-  if(file.size <= MAX_BYTES) return [{blob:file, name:file.name, offset:0}];
-  status('Файл большой, готовлю его по частям…', 3);
+async function splitAudio(file, force){
+  if(file.size <= MAX_BYTES && !force) return [{blob:file, name:file.name, offset:0}];
+  status('Длинная запись: режу её на части по 10 минут…', 3);
   const buf = await file.arrayBuffer();
-  const ctx = new (window.AudioContext||window.webkitAudioContext)();
+  const rate = 16000; let ctx;
+  try{ ctx = new (window.AudioContext||window.webkitAudioContext)({sampleRate:rate}); }catch(e){ ctx = new (window.AudioContext||window.webkitAudioContext)(); }
   const decoded = await ctx.decodeAudioData(buf); ctx.close();
-  const rate = 16000, len = Math.ceil(decoded.duration*rate);
-  const off = new OfflineAudioContext(1, len, rate);
-  const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start();
-  const mono = (await off.startRendering()).getChannelData(0);
+  let mono;
+  if(decoded.sampleRate === rate){ // сразу 16 кГц: просто сводим каналы в моно, без лишней памяти
+    mono = decoded.getChannelData(0);
+    if(decoded.numberOfChannels > 1){ const m = new Float32Array(mono.length); for(let ch=0; ch<decoded.numberOfChannels; ch++){ const d = decoded.getChannelData(ch); for(let i=0;i<d.length;i++) m[i] += d[i]/decoded.numberOfChannels; } mono = m; }
+  } else {
+    const off = new OfflineAudioContext(1, Math.ceil(decoded.duration*rate), rate);
+    const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start();
+    mono = (await off.startRendering()).getChannelData(0);
+  }
   const parts = [], step = CHUNK_SEC*rate;
   for(let i=0;i<mono.length;i+=step) parts.push({blob:wav(mono.subarray(i,i+step),rate), name:'part'+parts.length+'.wav', offset:i/rate});
   return parts;
@@ -413,9 +419,9 @@ function wav(samples, rate){
 
 /* ---------- pipeline ---------- */
 const WHISPER = ['whisper-large-v3-turbo','whisper-large-v3'], badWhisper = new Set();
-async function transcribe(file){
+async function transcribe(file, force){
   if(WHISPER.every(m => badWhisper.has(m))) badWhisper.clear();
-  const parts = await splitAudio(file);
+  const parts = await splitAudio(file, force);
   const segs = []; let language = '';
   for(let i=0;i<parts.length;i++){
     status(`Расшифровываю аудио${parts.length>1?` (часть ${i+1} из ${parts.length})`:''}…`, 10+40*i/parts.length);
@@ -429,6 +435,8 @@ async function transcribe(file){
       { const pp = LS.get('products', null); if(pp) fd.append('prompt', ('Naturonica. ' + Object.keys(pp.items).join(', ') + '.').slice(0, 600)); }
       try{ d = await groq('/audio/transcriptions', fd, true); break; }
       catch(e){
+        // длинный звонок целиком не прошёл (слишком большой / обрыв) — режем на части по 10 минут и пробуем снова
+        if(e.message!=='AUDIO_LIMIT' && !force && parts.length===1 && !/ключ|api key|invalid|401|403/i.test(e.message)){ status('Звонок длинный, расшифровываю его по частям…', 5); return transcribe(file, true); }
         if(e.message!=='AUDIO_LIMIT') throw e;
         badWhisper.add(wm); waitMax = Math.max(waitMax, e.wait||0);
         status('Лимит расшифровки на этой модели исчерпан, пробую запасную…');
@@ -542,17 +550,23 @@ const T = {
 };
 const CONDENSE_PROMPT = `Ты помогаешь тренеру по продажам. Тебе дают кусок расшифровки звонка оператора колл-центра с клиентом. Сделай подробный конспект этого куска, чтобы по нему можно было оценить работу оператора, НЕ слушая звонок. Сохраняй язык оригинала. Обязательно дословно цитируй: приветствие и представление оператора, вопросы о потребностях и ответы клиента, ключевые фразы презентации (что говорилось о продукте и как его принимать), все названные цены и курсы, каждое возражение клиента и каждый ответ оператора, просьбы о перезвоне, прощание и итог (продажа/отказ, сумма, адрес, сроки доставки). Пиши по порядку с временными метками. Ничего не выдумывай.
 Верни JSON: {"notes":"конспект"}`;
-async function condenseDialog(dlg){
+async function condenseDialog(dlg, budget){
+  budget = budget || 6500; // итоговый конспект должен влезть в бесплатный лимит Groq вместе с правилами
   const parts = []; let cur = '';
   dlg.split('\n').forEach(l => { if(cur.length + l.length > 9000 && cur){ parts.push(cur); cur=''; } cur += l + '\n'; });
   if(cur) parts.push(cur);
+  const per = Math.max(700, Math.floor(budget/parts.length));
   const notes = [];
   for(let i=0;i<parts.length;i++){
     status(`Длинный звонок: готовлю конспект (часть ${i+1} из ${parts.length})…`, 76+6*i/parts.length);
-    try{ const r = await chatJSON(CONDENSE_PROMPT, `Часть ${i+1} из ${parts.length}:\n` + parts[i], {small:true, max:1800}); notes.push(`— Часть ${i+1} —\n` + (r.notes||'')); }
-    catch(e){ notes.push(`— Часть ${i+1} —\n` + parts[i].slice(0, 3500)); }
+    try{ const r = await chatJSON(CONDENSE_PROMPT + `\nДлина конспекта этой части — не больше ${per} символов.`, `Часть ${i+1} из ${parts.length}:\n` + parts[i], {small:true, max:Math.min(1800, Math.ceil(per/2.5)+300)}); notes.push(`— Часть ${i+1} —\n` + clip(r.notes||'', per+300)); }
+    catch(e){ notes.push(`— Часть ${i+1} —\n` + parts[i].slice(0, Math.min(3500, per))); }
   }
-  return notes.join('\n');
+  let out = notes.join('\n');
+  // очень длинный звонок (30 мин и больше): сжимаем конспекты ещё раз
+  if(out.length > budget + 1500){ status('Длинный звонок: собираю общий конспект…', 82);
+    try{ const r = await chatJSON(CONDENSE_PROMPT + `\nТебе дают конспекты частей одного длинного звонка. Сведи их в один конспект всего звонка по порядку, не больше ${budget} символов, сохрани ключевые дословные цитаты.`, out.slice(0, 20000), {small:true, max:2500}); if(r.notes) out = r.notes; }catch(e){} }
+  return clip(out, budget + 1500);
 }
 function priceBlock(){
   const t = (LS.get('prices','')||'').trim();
@@ -980,30 +994,65 @@ function docxCall(P, r, lang, title){ // разбор одного звонка 
   if((r.recommendations||[]).length){ P.push({h:3, runs:[{t:'💡 '+t.recs}]}); r.recommendations.forEach(s=>P.push({indent:300, runs:[{t:'• '+s}]})); }
   if(r.script){ P.push({h:3, runs:[{t:'📝 '+t.script}]}); P.push({indent:300, runs:[green(r.script)]}); }
 }
+function docxFinal(P, c){ // итоговое резюме по всем звонкам — в конце файла, на русском
+  const r = c.summaryRep || (c.multi ? ((c.reports && c.reports.ru) || c.report) : null) || {}, t = T.ru, tr = c.traineeRep || {};
+  const red = s => ({t:s, color:DOCX_RED, bg:DOCX_RED_BG}), green = s => ({t:s, color:DOCX_GREEN, bg:DOCX_GREEN_BG});
+  const sc = (c.calls||[]).map(x=>+((x.report||{}).score)).filter(x=>!isNaN(x));
+  P.push({h:1, runs:[{t:'🏁 ИТОГОВОЕ РЕЗЮМЕ ПО ВСЕМ ЗВОНКАМ'}]});
+  P.push({runs:[{t:`Звонков: ${(c.calls||[]).length}`+(sc.length?` · ${t.avg}: ${(sc.reduce((a,b)=>a+b,0)/sc.length).toFixed(1)}/10`:''), b:true}]});
+  if(sc.length) P.push({runs:[{t:t.perCall+': '+(c.calls||[]).map((x,i)=>`#${i+1} — ${(x.report||{}).score??'—'}/10`).join(';  ')}]});
+  if(r.error && !tr.strengths){ P.push({runs:[red('⚠️ Итог не удалось сделать: '+r.error)]}); return; }
+  if(r.overview){ P.push({h:2, runs:[{t:'📋 '+t.overall}]}); P.push({runs:[{t:r.overview}]}); }
+  if(tr.strengths){ P.push({h:2, runs:[{t:'✅ Сильные стороны оператора', color:DOCX_GREEN}]}); P.push({runs:[{t:tr.strengths}]}); }
+  else if((r.strengths||[]).length){ P.push({h:2, runs:[{t:'✅ Сильные стороны оператора', color:DOCX_GREEN}]}); r.strengths.forEach(s=>P.push({indent:300, runs:[green('• '+s)]})); }
+  if(tr.to_learn){ P.push({h:2, runs:[{t:'📚 Что нужно доучить', color:DOCX_RED}]}); P.push({runs:[{t:tr.to_learn}]}); }
+  if((r.recurring_mistakes||[]).length){ P.push({h:2, runs:[{t:'❌ '+t.rec, color:DOCX_RED}]});
+    r.recurring_mistakes.forEach((m,i)=>{ P.push({indent:300, runs:[{t:`${i+1}. `, b:true}, red(m.mistake||''), ...(m.where?[{t:' ('+t.where+': '+m.where+')', i:true}]:[])]});
+      if(m.fix) P.push({indent:500, runs:[{t:t.fix+': ', b:true}, {t:m.fix}]});
+      if(m.phrase) P.push({indent:500, runs:[{t:'➜ '+t.phrase+': ', b:true}, green('«'+m.phrase+'»')]}); }); }
+  if((r.objections||[]).length){ P.push({h:2, runs:[{t:'🛡️ '+t.objs}]});
+    r.objections.forEach((o,i)=>{ P.push({indent:300, runs:[{t:`${i+1}. «${o.objection||''}»`, b:true}, ...(o.how_often?[{t:' ('+t.often+': '+o.how_often+')', i:true}]:[])]});
+      if(o.best_response) P.push({indent:500, runs:[{t:'➜ '+t.strong+': ', b:true}, green(o.best_response)]}); }); }
+  if((r.weak_stages||[]).length){ P.push({h:2, runs:[{t:'📉 Слабые этапы'}]}); r.weak_stages.forEach(s=>P.push({indent:300, runs:[red('• '+s)]})); }
+  if((r.status_errors||[]).length){ P.push({h:2, runs:[{t:'🏷️ Ошибки в статусах'}]}); r.status_errors.forEach(s=>P.push({indent:300, runs:[red('• '+s)]})); }
+  if(r.check_summary){ P.push({h:2, runs:[{t:'💶 Чек и продажи'}]}); P.push({runs:[{t:r.check_summary}]}); }
+  if((r.priorities||[]).length){ P.push({h:2, runs:[{t:'🎯 '+t.prio}]}); r.priorities.forEach(s=>P.push({indent:300, runs:[{t:'• '+s}]})); }
+  if((r.training_plan||[]).length){ P.push({h:2, runs:[{t:'🏋️ '+t.plan}]}); r.training_plan.forEach(s=>P.push({indent:300, runs:[{t:'• '+s}]})); }
+}
 function makeDocx(c){
   const P = [], lang = c.lang||'es', es = lang==='es';
   const op = c.operator ? ` · ${c.operator}` : '';
-  P.push({h:1, runs:[{t:(c.multi? (es?'Análisis de llamadas':'Разбор звонков') : c.trainee ? (es?'Resumen del becario':'Резюме стажёра') : (es?'Análisis de la llamada':'Разбор звонка'))+op}]});
+  const grp = c.multi || c.trainee;
+  P.push({h:1, runs:[{t:(grp ? 'Разбор звонков' : (es?'Análisis de la llamada':'Разбор звонка'))+op}]});
   P.push({runs:[{t:c.date||'', i:true}]});
-  P.push({runs:[{t:es?'Leyenda: ':'Обозначения: ', b:true}, {t:es?' error del operador ':' ошибка оператора ', color:DOCX_RED, bg:DOCX_RED_BG}, {t:'   '}, {t:es?' cómo debería decirlo / buena respuesta ':' как надо было сказать / правильная отработка ', color:DOCX_GREEN, bg:DOCX_GREEN_BG}]});
-  if(c.multi || c.trainee){
-    const r = c.report||{}, t = T[lang];
-    if(c.multi && r.overview){ P.push({h:2, runs:[{t:'📋 '+t.overall}]}); P.push({runs:[{t:r.overview}]});
-      (r.recurring_mistakes||[]).forEach(m=>{ P.push({indent:300, runs:[{t:'• ', b:true}, {t:m.mistake||'', color:DOCX_RED, bg:DOCX_RED_BG}, ...(m.where?[{t:' ('+m.where+')', i:true}]:[])]}); if(m.phrase||m.fix) P.push({indent:500, runs:[{t:'➜ ', b:true}, {t:[m.fix,m.phrase&&('«'+m.phrase+'»')].filter(Boolean).join(' '), color:DOCX_GREEN, bg:DOCX_GREEN_BG}]}); });
-      if((r.priorities||[]).length){ P.push({h:3, runs:[{t:es?'🎯 Prioridades':'🎯 Приоритеты'}]}); r.priorities.forEach(s=>P.push({indent:300, runs:[{t:'• '+s}]})); } }
-    if(c.trainee && r.strengths){ P.push({h:2, runs:[{t:'✅ '+(es?'Puntos fuertes':'Сильные стороны'), color:DOCX_GREEN}]}); P.push({runs:[{t:r.strengths}]}); P.push({h:2, runs:[{t:'📚 '+(es?'Qué debe reforzar':'Что нужно доучить'), color:DOCX_RED}]}); P.push({runs:[{t:r.to_learn||''}]}); }
+  if(grp) P.push({runs:[{t:`Звонков: ${(c.calls||[]).length}. Сначала разбор каждого звонка (на испанском), в конце — итоговое резюме по всем звонкам (на русском).`}]});
+  P.push({runs:[{t:es&&!grp?'Leyenda: ':'Обозначения: ', b:true}, {t:es&&!grp?' error del operador ':' ошибка оператора ', color:DOCX_RED, bg:DOCX_RED_BG}, {t:'   '}, {t:es&&!grp?' cómo debería decirlo / buena respuesta ':' как надо было сказать / правильная отработка ', color:DOCX_GREEN, bg:DOCX_GREEN_BG}]});
+  if(grp){
     const hist = LS.get('history',[]);
     (c.calls||[]).forEach((cc,i)=>{ const h = hist.find(x=>x.id===cc.id) || {}; const cl = h.lang || 'es';
       const rep = (h.reports && h.reports[cl]) || cc.report || h.report;
       docxCall(P, rep, cl, `${i+1}. ${cc.name||h.name||''}${(LINES[cc.line||h.line]||{}).short?' · '+LINES[cc.line||h.line].short:''}${RES[cc.result||h.result]?' · '+RES[cc.result||h.result][cl]:''}`); });
+    docxFinal(P, c);
   } else docxCall(P, c.report, lang, `${c.name||''}${(LINES[lineOf(c)]||{}).short?' · '+LINES[lineOf(c)].short:''}${RES[c.result]?' · '+RES[c.result][lang]:''}`);
   return docxBuild(P);
 }
-$('btnWord').onclick = () => {
+async function ensureFinal(c){ // для Word: итог по звонкам и резюме стажёра делаются сами, без отдельных кнопок
+  const hist = LS.get('history',[]);
+  const calls = (c.calls||[]).map(x=>{ const h = hist.find(y=>y.id===x.id)||{}; return {...x, result:x.result||h.result, line:x.line||h.line}; });
+  let changed = false;
+  if(c.trainee && !c.traineeRep){ const tr = (c.reports&&c.reports.ru) || c.report; if(tr && !tr.error){ c.traineeRep = tr; changed = true; } }
+  if(!c.traineeRep){ status('Word: готовлю резюме оператора (сильные стороны и что доучить)…', 60); try{ c.traineeRep = await traineeSummary({...c, calls}, 'ru'); changed = true; }catch(e){} }
+  if(c.trainee && !c.summaryRep){ status('Word: готовлю итог по всем звонкам…', 80); try{ c.summaryRep = await summarize(calls, 'ru', lineOf(c)); changed = true; }catch(e){} }
+  if(changed) saveHistory(c);
+}
+$('btnWord').onclick = async () => {
   if(!current) return;
+  const btn = $('btnWord'); btn.disabled = true;
+  try{ if(current.multi||current.trainee) await ensureFinal(current); } finally { btn.disabled = false; }
   const a = document.createElement('a'); a.href = URL.createObjectURL(makeDocx(current));
-  const base = (current.multi||current.trainee) ? ((current.operator||'operador')+'_'+(current.calls||[]).length+(current.lang==='es'?'_llamadas':'_звонков')) : current.name.replace(/\.[^.]+$/,'');
-  a.download = base.replace(/[\\/:*?"<>|]+/g,'_') + (current.lang==='es'?'_analisis.docx':'_разбор.docx');
+  const grp = current.multi||current.trainee;
+  const base = grp ? ((current.operator||'оператор')+'_'+(current.calls||[]).length+'_звонков') : current.name.replace(/\.[^.]+$/,'');
+  a.download = base.replace(/[\\/:*?"<>|]+/g,'_') + (grp||current.lang!=='es'?'_разбор.docx':'_analisis.docx');
   document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(a.href); }, 2000);
   status(current.lang==='es'?'Word descargado.':'Word скачан.',100);
 };
