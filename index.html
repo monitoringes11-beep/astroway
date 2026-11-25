@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v43</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v45</small></h1>
     <button id="btnSettings">⚙️ Настройки</button>
   </header>
 
@@ -141,7 +141,8 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
     <div class="actions">
       <button class="primary" id="btnTrainee2" title="Выжимка по всем продажам и отказам этого оператора для супервайзеров">🎓 Резюме стажёра</button>
       <button id="btnCopy">📋 Копировать всё</button>
-      <button class="primary" id="btnAllWord2" title="Один файл Word: разбор всех звонков этого оператора подряд и итоговое резюме в конце">📄 Один Word на все звонки</button>
+      <button class="primary btnAllWord" data-wlang="es" data-from-current="1" title="Один файл Word полностью на испанском: все звонки оператора + итог">📄 Word ES (todo en español)</button>
+      <button class="primary btnAllWord" data-wlang="ru" data-from-current="1" title="Один файл Word полностью на русском: все звонки оператора + итог">📄 Word RU (всё на русском)</button>
       <button id="btnWord" title="Word только с тем, что открыто сейчас">📄 Word этого звонка</button>
       <button id="btnDownload">⬇️ Скачать .txt</button>
       <button id="btnSwap">🔄 Поменять роли местами</button>
@@ -150,7 +151,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
   </div>
 
   <div class="card hidden" id="historyCard">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><h2 id="historyTitle" style="margin:0">Звонки оператора</h2><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="primary" id="btnAllWord" title="Один файл Word: разбор всех звонков этого оператора подряд и итоговое резюме в конце">📄 Один Word на все звонки</button><button class="primary" id="btnTrainee" title="Выжимка по всем продажам и отказам для группы супервайзеров">🎓 Резюме стажёра</button><button id="btnClearMine">🗑 Удалить звонки оператора</button></span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><h2 id="historyTitle" style="margin:0">Звонки оператора</h2><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="primary btnAllWord" data-wlang="es" title="Один файл Word полностью на испанском: разбор всех звонков оператора и итоговое резюме в конце">📄 Word ES (todo en español)</button><button class="primary btnAllWord" data-wlang="ru" title="Один файл Word полностью на русском: разбор всех звонков оператора и итоговое резюме в конце">📄 Word RU (всё на русском)</button><button class="primary" id="btnTrainee" title="Выжимка по всем продажам и отказам для группы супервайзеров">🎓 Резюме стажёра</button><button id="btnClearMine">🗑 Удалить звонки оператора</button></span></div>
     <div class="hist" id="history"></div>
   </div>
 
@@ -586,26 +587,32 @@ const GLOBAL_RULES = `ЗАПРЕЩЕНО НА ВСЕХ ЛИНИЯХ (в любо
 `;
 /* ---------- разбор на испанском: без русских вставок ---------- */
 const CYR = /[А-Яа-яЁё]/;
-async function fixSpanish(rep){
+const LAT = /[A-Za-zÁÉÍÓÚÑáéíóúñ]{3,}/;
+async function translateRep(rep, target){ // target 'es': убрать русские вставки; 'ru': весь текст на русский
   if(!rep || rep.error) return rep;
+  const need = target==='es' ? (v => CYR.test(v)) : (v => LAT.test(v));
   const items = [];
-  (function walk(o){ if(Array.isArray(o)) o.forEach((v,i)=>{ if(typeof v==='string'){ if(CYR.test(v)) items.push([o,i]); } else if(v&&typeof v==='object') walk(v); });
-    else if(o && typeof o==='object') Object.keys(o).forEach(k=>{ const v=o[k]; if(typeof v==='string'){ if(CYR.test(v)) items.push([o,k]); } else if(v&&typeof v==='object') walk(v); }); })(rep);
+  (function walk(o){ if(Array.isArray(o)) o.forEach((v,i)=>{ if(typeof v==='string'){ if(need(v)) items.push([o,i]); } else if(v&&typeof v==='object') walk(v); });
+    else if(o && typeof o==='object') Object.keys(o).forEach(k=>{ const v=o[k]; if(typeof v==='string'){ if(need(v)) items.push([o,k]); } else if(v&&typeof v==='object') walk(v); }); })(rep);
   if(!items.length) return rep;
-  status('Перевожу русские вставки в разборе на испанский…', 97);
+  const lim = target==='es' ? 4500 : 3000;
   const groups = []; let cur = [], len = 0;
-  items.forEach(it => { const l = String(it[0][it[1]]).length; if(cur.length && len + l > 4500){ groups.push(cur); cur=[]; len=0; } cur.push(it); len += l; });
+  items.forEach(it => { const l = String(it[0][it[1]]).length; if(cur.length && len + l > lim){ groups.push(cur); cur=[]; len=0; } cur.push(it); len += l; });
   if(cur.length) groups.push(cur);
-  for(const g of groups){
-    const src = g.map(([o,k])=>o[k]);
+  const sys = target==='es'
+    ? `Ты переводчик разборов звонков для стажёров колл-центра в Испании. Тебе дают массив строк, в которых есть русский текст. Переведи КАЖДУЮ строку полностью на испанский (Испания): русские слова и фразы переведи, испанские части (цитаты, готовые фразы) оставь как есть. Термины: «Отказ» = «Rechazo», «Подтверждение» = «Confirmado», «Перезвон» = «Rellamada», «Дубль» = «Duplicado», «ОЛ» = «línea general». Ничего не добавляй и не сокращай.`
+    : `Ты переводчик разборов звонков колл-центра для руководителя, который читает только по-русски. Тебе дают массив строк на испанском (или смешанных). Переведи КАЖДУЮ строку полностью на русский, включая цитаты оператора и клиента и готовые фразы (переводи их по смыслу, в кавычках). Названия продуктов и марок (Naturonica, Artronol и т.п.) оставь латиницей. Термины: «Rechazo» = «Отказ», «Confirmado» = «Подтверждение», «Rellamada» = «Перезвон», «Duplicado» = «Дубль». Ничего не добавляй и не сокращай.`;
+  for(let gi=0; gi<groups.length; gi++){
+    const g = groups[gi], src = g.map(([o,k])=>o[k]);
+    if(groups.length>1) status(`Перевод ${target==='es'?'на испанский':'на русский'} (часть ${gi+1} из ${groups.length})…`);
     try{
-      const r = await chatJSON(`Ты переводчик разборов звонков для стажёров колл-центра в Испании. Тебе дают массив строк, в которых есть русский текст. Переведи КАЖДУЮ строку полностью на испанский (Испания): русские слова и фразы переведи, испанские части (цитаты, готовые фразы) оставь как есть. Термины: «Отказ» = «Rechazo», «Подтверждение» = «Confirmado», «Перезвон» = «Rellamada», «Дубль» = «Duplicado», «ОЛ» = «línea general». Ничего не добавляй и не сокращай.
-Верни JSON: {"t":["перевод 1","перевод 2", ...]} — ровно ${src.length} строк в том же порядке.`, JSON.stringify(src), {small:true, max:Math.min(4000, Math.ceil(src.join('').length/2)+400)});
+      const r = await chatJSON(sys + `\nВерни JSON: {"t":["перевод 1","перевод 2", ...]} — ровно ${src.length} строк в том же порядке.`, JSON.stringify(src), {small:true, max:Math.min(4000, Math.ceil(src.join('').length*(target==='es'?0.5:0.9))+400)});
       if(Array.isArray(r.t) && r.t.length===src.length) g.forEach(([o,k],i)=>{ if(typeof r.t[i]==='string' && r.t[i].trim()) o[k] = r.t[i]; });
     }catch(e){}
   }
   return rep;
 }
+async function fixSpanish(rep){ if(rep && !rep.error && CYR.test(JSON.stringify(rep))) status('Перевожу русские вставки в разборе на испанский…', 97); return translateRep(rep, 'es'); }
 async function analyze(turns, language, lang, line, result){
   lang = lang || 'es'; const t = T[lang]; const L = LINES[line||'ol'];
   const ctx = $('context').value ? `Оператор продаёт: ${$('context').value}.\n` : '';
@@ -1018,18 +1025,20 @@ function docxCall(P, r, lang, title){ // разбор одного звонка 
   if((r.recommendations||[]).length){ P.push({h:3, runs:[{t:'💡 '+t.recs}]}); r.recommendations.forEach(s=>P.push({indent:300, runs:[{t:'• '+s}]})); }
   if(r.script){ P.push({h:3, runs:[{t:'📝 '+t.script}]}); P.push({indent:300, runs:[green(r.script)]}); }
 }
-function docxFinal(P, c){ // итоговое резюме по всем звонкам — в конце файла, на русском
-  const r = c.summaryRep || (c.multi ? ((c.reports && c.reports.ru) || c.report) : null) || {}, t = T.ru, tr = c.traineeRep || {};
+function docxFinal(P, c, lang, r, tr){ // итоговое резюме по всем звонкам — в конце файла
+  lang = lang || 'ru'; const es = lang==='es', t = T[lang];
+  r = r || c.summaryRep || (c.multi ? ((c.reports && c.reports.ru) || c.report) : null) || {}; tr = tr || c.traineeRep || {};
   const red = s => ({t:s, color:DOCX_RED, bg:DOCX_RED_BG}), green = s => ({t:s, color:DOCX_GREEN, bg:DOCX_GREEN_BG});
   const sc = (c.calls||[]).map(x=>+((x.report||{}).score)).filter(x=>!isNaN(x));
-  P.push({h:1, runs:[{t:'🏁 ИТОГОВОЕ РЕЗЮМЕ ПО ВСЕМ ЗВОНКАМ'}]});
-  P.push({runs:[{t:`Звонков: ${(c.calls||[]).length}`+(sc.length?` · ${t.avg}: ${(sc.reduce((a,b)=>a+b,0)/sc.length).toFixed(1)}/10`:''), b:true}]});
+  P.push({h:1, runs:[{t:es?'🏁 RESUMEN FINAL DE TODAS LAS LLAMADAS':'🏁 ИТОГОВОЕ РЕЗЮМЕ ПО ВСЕМ ЗВОНКАМ'}]});
+  P.push({runs:[{t:(es?'Llamadas: ':'Звонков: ')+(c.calls||[]).length+(sc.length?` · ${t.avg}: ${(sc.reduce((a,b)=>a+b,0)/sc.length).toFixed(1)}/10`:''), b:true}]});
   if(sc.length) P.push({runs:[{t:t.perCall+': '+(c.calls||[]).map((x,i)=>`#${i+1} — ${(x.report||{}).score??'—'}/10`).join(';  ')}]});
-  if(r.error && !tr.strengths){ P.push({runs:[red('⚠️ Итог не удалось сделать: '+r.error)]}); return; }
+  if(r.error && !tr.strengths){ P.push({runs:[red('⚠️ '+(es?'No se pudo hacer el resumen: ':'Итог не удалось сделать: ')+r.error)]}); return; }
   if(r.overview){ P.push({h:2, runs:[{t:'📋 '+t.overall}]}); P.push({runs:[{t:r.overview}]}); }
-  if(tr.strengths){ P.push({h:2, runs:[{t:'✅ Сильные стороны оператора', color:DOCX_GREEN}]}); P.push({runs:[{t:tr.strengths}]}); }
-  else if((r.strengths||[]).length){ P.push({h:2, runs:[{t:'✅ Сильные стороны оператора', color:DOCX_GREEN}]}); r.strengths.forEach(s=>P.push({indent:300, runs:[green('• '+s)]})); }
-  if(tr.to_learn){ P.push({h:2, runs:[{t:'📚 Что нужно доучить', color:DOCX_RED}]}); P.push({runs:[{t:tr.to_learn}]}); }
+  const stT = es?'✅ Puntos fuertes del operador':'✅ Сильные стороны оператора';
+  if(tr.strengths){ P.push({h:2, runs:[{t:stT, color:DOCX_GREEN}]}); P.push({runs:[{t:tr.strengths}]}); }
+  else if((r.strengths||[]).length){ P.push({h:2, runs:[{t:stT, color:DOCX_GREEN}]}); r.strengths.forEach(s=>P.push({indent:300, runs:[green('• '+s)]})); }
+  if(tr.to_learn){ P.push({h:2, runs:[{t:es?'📚 Qué debe reforzar':'📚 Что нужно доучить', color:DOCX_RED}]}); P.push({runs:[{t:tr.to_learn}]}); }
   if((r.recurring_mistakes||[]).length){ P.push({h:2, runs:[{t:'❌ '+t.rec, color:DOCX_RED}]});
     r.recurring_mistakes.forEach((m,i)=>{ P.push({indent:300, runs:[{t:`${i+1}. `, b:true}, red(m.mistake||''), ...(m.where?[{t:' ('+t.where+': '+m.where+')', i:true}]:[])]});
       if(m.fix) P.push({indent:500, runs:[{t:t.fix+': ', b:true}, {t:m.fix}]});
@@ -1037,11 +1046,26 @@ function docxFinal(P, c){ // итоговое резюме по всем зво�
   if((r.objections||[]).length){ P.push({h:2, runs:[{t:'🛡️ '+t.objs}]});
     r.objections.forEach((o,i)=>{ P.push({indent:300, runs:[{t:`${i+1}. «${o.objection||''}»`, b:true}, ...(o.how_often?[{t:' ('+t.often+': '+o.how_often+')', i:true}]:[])]});
       if(o.best_response) P.push({indent:500, runs:[{t:'➜ '+t.strong+': ', b:true}, green(o.best_response)]}); }); }
-  if((r.weak_stages||[]).length){ P.push({h:2, runs:[{t:'📉 Слабые этапы'}]}); r.weak_stages.forEach(s=>P.push({indent:300, runs:[red('• '+s)]})); }
-  if((r.status_errors||[]).length){ P.push({h:2, runs:[{t:'🏷️ Ошибки в статусах'}]}); r.status_errors.forEach(s=>P.push({indent:300, runs:[red('• '+s)]})); }
-  if(r.check_summary){ P.push({h:2, runs:[{t:'💶 Чек и продажи'}]}); P.push({runs:[{t:r.check_summary}]}); }
+  if((r.weak_stages||[]).length){ P.push({h:2, runs:[{t:es?'📉 Etapas más débiles':'📉 Слабые этапы'}]}); r.weak_stages.forEach(s=>P.push({indent:300, runs:[red('• '+s)]})); }
+  if((r.status_errors||[]).length){ P.push({h:2, runs:[{t:es?'🏷️ Errores de estado':'🏷️ Ошибки в статусах'}]}); r.status_errors.forEach(s=>P.push({indent:300, runs:[red('• '+s)]})); }
+  if(r.check_summary){ P.push({h:2, runs:[{t:es?'💶 Ticket y ventas':'💶 Чек и продажи'}]}); P.push({runs:[{t:r.check_summary}]}); }
   if((r.priorities||[]).length){ P.push({h:2, runs:[{t:'🎯 '+t.prio}]}); r.priorities.forEach(s=>P.push({indent:300, runs:[{t:'• '+s}]})); }
   if((r.training_plan||[]).length){ P.push({h:2, runs:[{t:'🏋️ '+t.plan}]}); r.training_plan.forEach(s=>P.push({indent:300, runs:[{t:'• '+s}]})); }
+}
+// один язык на весь файл: lang 'es' или 'ru'
+function makeDocxAll(c, lang, finalRep, finalTr){
+  const P = [], es = lang==='es', hist = LS.get('history',[]);
+  const op = c.operator ? ` · ${es&&c.operator==='Без имени'?'Sin nombre':c.operator}` : '';
+  P.push({h:1, runs:[{t:(es?'Análisis de llamadas':'Разбор звонков')+op}]});
+  P.push({runs:[{t:c.date||'', i:true}]});
+  P.push({runs:[{t:es?`Llamadas: ${(c.calls||[]).length}. Primero el análisis de cada llamada; al final, el resumen de todas las llamadas.`:`Звонков: ${(c.calls||[]).length}. Сначала разбор каждого звонка, в конце — итоговое резюме по всем звонкам.`}]});
+  P.push({runs:[{t:es?'Leyenda: ':'Обозначения: ', b:true}, {t:es?' error del operador ':' ошибка оператора ', color:DOCX_RED, bg:DOCX_RED_BG}, {t:'   '}, {t:es?' cómo debería decirlo / buena respuesta ':' как надо было сказать / правильная отработка ', color:DOCX_GREEN, bg:DOCX_GREEN_BG}]});
+  (c.calls||[]).forEach((cc,i)=>{ const h = hist.find(x=>x.id===cc.id) || {};
+    const rep = es ? ((h.reports && h.reports.es) || cc.report || h.report) : (h.docxRu || cc.report || h.report);
+    const ln = LINES[cc.line||h.line], rs = RES[cc.result||h.result];
+    docxCall(P, rep, lang, `${i+1}. ${cc.name||h.name||''}${ln?' · '+(es&&ln.esShort||ln.short):''}${rs?' · '+rs[lang]:''}`); });
+  docxFinal(P, c, lang, finalRep, finalTr);
+  return docxBuild(P);
 }
 function makeDocx(c){
   const P = [], lang = c.lang||'es', es = lang==='es';
@@ -1085,32 +1109,53 @@ $('btnWord').onclick = async () => {
   downloadDocx(current);
   status(current.lang==='es'?'Word descargado.':'Word скачан.',100);
 };
-// ОДИН Word на все звонки оператора: все разборы подряд + итоговое резюме в конце
-async function allWord(){
-  const op = opName();
+// ОДИН Word на все звонки оператора: все разборы подряд + итоговое резюме в конце, весь файл на одном языке
+const clone = o => JSON.parse(JSON.stringify(o));
+async function allWord(lang){
+  const op = opName(), es = lang==='es';
   const calls = LS.get('history',[]).filter(x => (x.operator||'Без имени')===op && !x.multi && !x.trainee && x.report && !x.report.error)
     .slice(0, 30).reverse().map(x => ({id:x.id, name:x.name, score:x.report.score, report:(x.reports&&x.reports.es)||x.report, result:x.result, line:x.line}));
   if(!calls.length){ status('⚠️ У этого оператора пока нет разобранных звонков. Сначала загрузите звонки.', 0); return; }
-  const btns = [$('btnAllWord'), $('btnAllWord2')]; btns.forEach(x=>x.disabled=true);
+  const btns = document.querySelectorAll('.btnAllWord'); btns.forEach(x=>x.disabled=true);
   try{
     const key = calls.map(x=>x.id).join(',');
     // если итог по этим же звонкам уже делали — берём готовый, лимиты не тратим
     let c = LS.get('history',[]).find(x => x.multi && (x.operator||'Без имени')===op && (x.calls||[]).map(y=>y.id).join(',')===key && x.report && !x.report.error);
     if(!c){
-      status(`Один Word: готовлю итог по ${calls.length} звонкам…`, 50);
+      status(`Word: готовлю итог по ${calls.length} звонкам…`, 50);
       const line = calls[calls.length-1].line || $('line').value; let report;
       try{ report = await summarize(calls, 'ru', line); }catch(e){ report = {error:e.message}; }
       c = {id:Date.now(), operator:op, line, multi:true, name:`Сводный разбор · ${calls.length} звонков`, date:new Date().toLocaleString('ru-RU'), calls, report, lang:'ru', reports:{ru:report}, turns:[]};
     }
     c.lang = 'ru'; c.report = (c.reports&&c.reports.ru) || c.report;
-    await ensureFinal(c); saveHistory(c);
-    current = c; render(c); renderHistory();
-    downloadDocx(c);
-    status(`Готово: скачан один Word на ${calls.length} звонков (разбор каждого + итоговое резюме в конце).`, 100);
+    await ensureFinal(c); // итог (RU) + резюме оператора (RU) + испанские разборы без русских вставок
+    let finalRep, finalTr;
+    if(es){ // итог и резюме оператора — на испанском (переводим один раз и запоминаем)
+      if(!c.docxEs){ status('Word ES: перевожу итоговое резюме на испанский…', 85);
+        const r = clone(c.report||{}), tr = clone(c.traineeRep||{});
+        await translateRep(r, 'es'); await translateRep(tr, 'es'); c.docxEs = {r, tr}; }
+      finalRep = c.docxEs.r; finalTr = c.docxEs.tr;
+    } else { // разборы звонков — на русском (переводим один раз и запоминаем у каждого звонка)
+      const hist = LS.get('history',[]);
+      for(let i=0;i<calls.length;i++){ const h = hist.find(x=>x.id===calls[i].id); if(!h || h.docxRu) continue;
+        status(`Word RU: перевожу разбор звонка ${i+1} из ${calls.length} на русский…`, 60+35*i/calls.length);
+        const src = clone((h.reports && h.reports.es) || h.report); await translateRep(src, 'ru'); h.docxRu = src; saveHistory(h); }
+      finalRep = c.report; finalTr = c.traineeRep;
+      // на всякий случай: испанские слова в итоге тоже переводим
+      if(!c.docxRuFinal){ const r = clone(finalRep||{}), tr = clone(finalTr||{}); await translateRep(r,'ru'); await translateRep(tr,'ru'); c.docxRuFinal = {r, tr}; }
+      finalRep = c.docxRuFinal.r; finalTr = c.docxRuFinal.tr;
+    }
+    saveHistory(c); current = c; render(c); renderHistory();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(makeDocxAll(c, lang, finalRep, finalTr));
+    a.download = ((c.operator||'operador')+'_'+calls.length+(es?'_llamadas_ES.docx':'_звонков_RU.docx')).replace(/[\\/:*?"<>|]+/g,'_');
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(a.href); }, 2000);
+    status(es?`Готово: скачан Word на испанском (${calls.length} звонков + итог).`:`Готово: скачан Word на русском (${calls.length} звонков + итог).`, 100);
   } finally { btns.forEach(x=>x.disabled=false); }
 }
-$('btnAllWord').onclick = allWord;
-$('btnAllWord2').onclick = () => { if(current && current.operator){ $('operator').value = current.operator; LS.set('operator', current.operator); } allWord(); };
+document.querySelectorAll('.btnAllWord').forEach(bt => bt.onclick = () => {
+  if(bt.dataset.fromCurrent && current && current.operator){ $('operator').value = current.operator; LS.set('operator', current.operator); }
+  allWord(bt.dataset.wlang);
+});
 
 /* ---------- history ---------- */
 function saveHistory(c){
