@@ -67,8 +67,8 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v46</small></h1>
-    <button id="btnSettings">⚙️ Настройки</button>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v47</small></h1>
+    <span style="display:flex;gap:8px"><button class="primary" id="btnArchive" title="Все прошлые разборы по дням">🗂 Архив</button><button id="btnSettings">⚙️ Настройки</button></span>
   </header>
 
   <div class="card hidden" id="settings">
@@ -128,6 +128,11 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
     <div class="status hidden" id="status"><span id="statusText"></span><div class="bar"><i id="barFill"></i></div></div>
   </div>
 
+  <div class="card" id="daysCard">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">📅 Архив по дням</h2><span style="display:flex;gap:6px;flex-wrap:wrap"><button id="btnExport" title="Не обязательно: запасная копия архива файлом, например для другого компьютера">💾 Запасная копия</button><button id="btnImport" title="Загрузить разборы из запасной копии (например, на другом компьютере)">📂 Из копии</button><input type="file" id="importFile" accept=".json,application/json" class="hidden"></span></div>
+    <p class="muted" style="margin-top:-6px">Все разборы сохраняются автоматически, ничего скачивать не нужно. Раскройте день и нажмите на звонок, чтобы открыть разбор, или скачайте Word по оператору за этот день.</p>
+    <div id="days"><p class="muted">Пока нет разборов.</p></div>
+  </div>
   <div class="card hidden" id="result">
     <div class="tabs">
       <button data-tab="report" class="on">Рекомендации</button>
@@ -155,11 +160,6 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
     <div class="hist" id="history"></div>
   </div>
 
-  <div class="card" id="daysCard">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">📅 Архив по дням</h2><span style="display:flex;gap:6px;flex-wrap:wrap"><button id="btnExport" title="Сохранить все разборы в файл на компьютер">💾 Сохранить архив в файл</button><button id="btnImport" title="Загрузить разборы из сохранённого файла (например, на другом компьютере)">📂 Загрузить архив из файла</button><input type="file" id="importFile" accept=".json,application/json" class="hidden"></span></div>
-    <p class="muted" style="margin-top:-6px">Все разборы сохраняются в этом браузере и остаются после закрытия сайта и при переходе на новую версию. Раскройте день, чтобы открыть разбор или скачать Word по звонкам оператора за этот день.</p>
-    <div id="days"><p class="muted">Пока нет разборов.</p></div>
-  </div>
   <div class="card hidden" id="archiveCard">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">🗂️ Архив операторов</h2><button id="btnClearArchive">🗑 Очистить весь архив</button></div>
     <p class="muted" style="margin-top:-6px">Звонки других операторов. Нажмите на папку, чтобы раскрыть, или «Открыть оператора», чтобы снова работать с ним.</p>
@@ -1170,23 +1170,40 @@ function idb(){ return new Promise((res, rej) => { const r = indexedDB.open('zvo
 async function idbGet(k){ const db = await idb(); return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function idbSet(k, v){ const db = await idb(); return new Promise((res, rej) => { const t = db.transaction('kv','readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); }
 let histSaving = Promise.resolve();
+const DEL_KEY = 'history_deleted';
+function lsBackup(h){ // копия в localStorage: её видят и старые ссылки сайта; если не влезает — без тяжёлых полей и самых старых разборов
+  const slim = h.map(x => { const y = {...x}; delete y.docxRu; delete y.docxEs; delete y.docxRuFinal; return y; });
+  let x = slim; while(x.length){ try{ localStorage.setItem('history', JSON.stringify(x)); return; }catch{ x = x.slice(0, Math.floor(x.length*0.8)); } }
+}
 function setHist(h){
   HIST = h;
   const snap = JSON.parse(JSON.stringify(h));
-  histSaving = histSaving.then(() => idbSet('history', snap)).catch(e => {
-    // запасной вариант: localStorage (меньше места — при переполнении убираем самые старые)
-    let x = snap; while(x.length){ try{ localStorage.setItem('history', JSON.stringify(x)); break; }catch{ x = x.slice(0, -1); } }
-  });
+  histSaving = histSaving.then(() => idbSet('history', snap)).catch(()=>{});
+  lsBackup(snap);
+  updateArchiveBadge();
 }
+function markDeleted(ids){ const d = new Set(LS.get(DEL_KEY, []).map(String)); ids.forEach(i=>d.add(String(i))); LS.set(DEL_KEY, [...d].slice(-5000)); }
 async function loadHist(){
   let h = null;
   try{ h = await idbGet('history'); }catch(e){}
-  const old = LS.get('history', null); // разборы из прежних версий сайта
   if(!Array.isArray(h)) h = [];
-  if(Array.isArray(old) && old.length){ const ids = new Set(h.map(x=>x.id)); old.forEach(x => { if(!ids.has(x.id)) h.push(x); }); h.sort((a,b)=>b.id-a.id); }
-  HIST = h;
-  if(Array.isArray(old) && old.length){ try{ await idbSet('history', h); localStorage.removeItem('history'); }catch(e){} }
+  const old = LS.get('history', null); // копия в localStorage (и разборы из прежних версий сайта)
+  const del = new Set(LS.get(DEL_KEY, []).map(String));
+  const ids = new Set(h.map(x=>String(x.id)));
+  if(Array.isArray(old)) old.forEach(x => { if(x && !ids.has(String(x.id))){ h.push(x); ids.add(String(x.id)); } });
+  h = h.filter(x => x && !del.has(String(x.id))).sort((a,b)=>b.id-a.id);
+  HIST = h; setHist(h);
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+}
+const HOME_LINK = 'https://raw.githack.com/monitoringes11-beep/astroway/zvonki-site/open.html';
+function updateArchiveBadge(){ const b = $('btnArchive'); if(b) b.textContent = `🗂 Архив (${HIST.filter(x=>!x.multi&&!x.trainee).length})`; }
+function storageWarning(){
+  const ok = location.hostname === 'raw.githack.com';
+  let st = true; try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); }catch(e){ st = false; }
+  if(ok && st) return;
+  const w = document.createElement('div'); w.className = 'card'; w.style.cssText = 'border:2px solid #f59e0b;background:#fffbeb';
+  w.innerHTML = `⚠️ <b>Сайт открыт не по основной ссылке${st?'':' (или в режиме, где браузер ничего не запоминает)'}</b>, поэтому архив здесь может не сохраниться. Откройте основную ссылку и сохраните её в закладки: <a href="${HOME_LINK}">${HOME_LINK}</a>`;
+  document.querySelector('.wrap header').after(w);
 }
 /* ---------- history ---------- */
 function saveHistory(c){
@@ -1201,6 +1218,7 @@ function histRow(x){
 function removeWhere(fn, question){
   const h = getHist(); const n = h.filter(fn).length;
   if(!n || !confirm(question.replace('{n}', n))) return;
+  markDeleted(h.filter(fn).map(x=>x.id));
   const keep = h.filter(x=>!fn(x)); setHist(keep);
   if(current && fn(current)){ current=null; $('result').classList.add('hidden'); }
   renderHistory();
@@ -1261,6 +1279,7 @@ $('importFile').onchange = async () => {
     if(!Array.isArray(list)) throw new Error('это не файл архива');
     const h = getHist().slice(), ids = new Set(h.map(x=>String(x.id))); let n = 0;
     list.forEach(x => { if(x && x.id && !ids.has(String(x.id))){ h.push(x); ids.add(String(x.id)); n++; } });
+    { const back = new Set(list.map(x=>String(x&&x.id))); LS.set(DEL_KEY, LS.get(DEL_KEY,[]).filter(i=>!back.has(String(i)))); }
     h.sort((a,b)=>b.id-a.id); setHist(h); renderHistory();
     status(`Загружено из файла: ${n} новых разборов${list.length-n?` (${list.length-n} уже были)`:''}.`, 100);
   }catch(e){ status('⚠️ Не удалось загрузить архив: '+e.message, 0); }
@@ -1268,7 +1287,9 @@ $('importFile').onchange = async () => {
 };
 $('btnClearArchive').onclick = () => { const me = opName(); removeWhere(x=>(x.operator||'Без имени')!==me, 'Удалить весь архив других операторов ({n} разборов)? Звонки текущего оператора останутся.'); };
 $('btnClearMine').onclick = () => { const me = opName(); removeWhere(x=>(x.operator||'Без имени')===me, `Удалить все звонки оператора «${me}» ({n} разборов)?`); };
-loadSettings(); prodInfo(); loadHist().then(renderHistory, renderHistory);
+$('btnArchive').onclick = () => { renderDays(); const c = $('daysCard'); const d = c.querySelector('details'); if(d) d.open = true; c.scrollIntoView({behavior:'smooth', block:'start'}); };
+storageWarning();
+loadSettings(); prodInfo(); loadHist().then(()=>{ renderHistory(); updateArchiveBadge(); }, renderHistory);
 </script>
 </body>
 </html>

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Разбор звонков</title>
+<style>body{font:16px system-ui,sans-serif;background:#f6f7fb;color:#222;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style></head>
+<body><p id="m">Открываю последнюю версию сайта…</p>
+<script>
+// Постоянная ссылка: всегда открывает самую свежую версию сайта (архив у всех версий общий)
+const REPO = 'monitoringes11-beep/astroway', FALLBACK = 'zvonki-site';
+const go = sha => location.replace(`https://raw.githack.com/${REPO}/${sha}/index.html${location.hash}`);
+fetch(`https://api.github.com/repos/${REPO}/commits/zvonki-site`, {headers:{Accept:'application/vnd.github+json'}})
+  .then(r => r.ok ? r.json() : Promise.reject()).then(d => go(d.sha)).catch(() => go(FALLBACK));
+setTimeout(() => go(FALLBACK), 6000);
+</script></body></html>
