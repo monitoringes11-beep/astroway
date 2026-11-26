@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v47</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v48</small></h1>
     <span style="display:flex;gap:8px"><button class="primary" id="btnArchive" title="Все прошлые разборы по дням">🗂 Архив</button><button id="btnSettings">⚙️ Настройки</button></span>
   </header>
 
@@ -104,6 +104,10 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
       </div>
       <p class="muted" style="margin:6px 0 0">Как получить файл: открыть таблицу в Google → Файл → Скачать → Microsoft Excel (.xlsx). Файл можно также просто перетащить в поле для звонков.</p>
     </div>
+    <div style="margin-top:12px;padding:10px;border:1px dashed var(--line);border-radius:10px">
+      <label>🗂 Перенос архива на другой компьютер (обычно не нужно — архив сохраняется сам)</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button id="btnExport">💾 Скачать архив одним файлом</button><button id="btnImport">📂 Загрузить архив из скачанного файла</button><input type="file" id="importFile" accept=".json,application/json" class="hidden"></div>
+    </div>
     <p class="muted">Ключ получить бесплатно: <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a></p>
     <div class="actions"><button class="primary" id="btnSave">Сохранить</button></div>
   </div>
@@ -129,8 +133,9 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
   </div>
 
   <div class="card" id="daysCard">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">📅 Архив по дням</h2><span style="display:flex;gap:6px;flex-wrap:wrap"><button id="btnExport" title="Не обязательно: запасная копия архива файлом, например для другого компьютера">💾 Запасная копия</button><button id="btnImport" title="Загрузить разборы из запасной копии (например, на другом компьютере)">📂 Из копии</button><input type="file" id="importFile" accept=".json,application/json" class="hidden"></span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">📅 Архив по дням</h2></div>
     <p class="muted" style="margin-top:-6px">Все разборы сохраняются автоматически, ничего скачивать не нужно. Раскройте день и нажмите на звонок, чтобы открыть разбор, или скачайте Word по оператору за этот день.</p>
+    <div id="storeInfo" class="muted" style="font-size:13px;margin:-4px 0 8px"></div>
     <div id="days"><p class="muted">Пока нет разборов.</p></div>
   </div>
   <div class="card hidden" id="result">
@@ -1178,9 +1183,9 @@ function lsBackup(h){ // копия в localStorage: её видят и стар
 function setHist(h){
   HIST = h;
   const snap = JSON.parse(JSON.stringify(h));
-  histSaving = histSaving.then(() => idbSet('history', snap)).catch(()=>{});
+  histSaving = histSaving.then(() => idbSet('history', snap)).then(()=>{ window.__saveFail = false; }, ()=>{ window.__saveFail = true; });
   lsBackup(snap);
-  updateArchiveBadge();
+  updateArchiveBadge(); storeInfo();
 }
 function markDeleted(ids){ const d = new Set(LS.get(DEL_KEY, []).map(String)); ids.forEach(i=>d.add(String(i))); LS.set(DEL_KEY, [...d].slice(-5000)); }
 async function loadHist(){
@@ -1193,17 +1198,26 @@ async function loadHist(){
   if(Array.isArray(old)) old.forEach(x => { if(x && !ids.has(String(x.id))){ h.push(x); ids.add(String(x.id)); } });
   h = h.filter(x => x && !del.has(String(x.id))).sort((a,b)=>b.id-a.id);
   HIST = h; setHist(h);
-  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}
 }
 const HOME_LINK = 'https://raw.githack.com/monitoringes11-beep/astroway/zvonki-site/open.html';
 function updateArchiveBadge(){ const b = $('btnArchive'); if(b) b.textContent = `🗂 Архив (${HIST.filter(x=>!x.multi&&!x.trainee).length})`; }
+let STORE_OK = true;
 function storageWarning(){
-  const ok = location.hostname === 'raw.githack.com';
-  let st = true; try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); }catch(e){ st = false; }
-  if(ok && st) return;
-  const w = document.createElement('div'); w.className = 'card'; w.style.cssText = 'border:2px solid #f59e0b;background:#fffbeb';
-  w.innerHTML = `⚠️ <b>Сайт открыт не по основной ссылке${st?'':' (или в режиме, где браузер ничего не запоминает)'}</b>, поэтому архив здесь может не сохраниться. Откройте основную ссылку и сохраните её в закладки: <a href="${HOME_LINK}">${HOME_LINK}</a>`;
+  const home = location.hostname === 'raw.githack.com';
+  try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); }catch(e){ STORE_OK = false; }
+  if(home && STORE_OK) return;
+  const w = document.createElement('div'); w.className = 'card'; w.style.cssText = 'border:2px solid #dc2626;background:#fef2f2;color:#7f1d1d';
+  w.innerHTML = `<b style="font-size:17px">⚠️ Здесь архив НЕ сохраняется</b><br>Сайт открыт не по основной ссылке (например, из приложения или из скачанного файла)${STORE_OK?'':', и браузер здесь ничего не запоминает'}. Разборы, сделанные здесь, пропадут после закрытия.<br><a href="${HOME_LINK}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;padding:10px 16px;background:#dc2626;color:#fff;border-radius:10px;text-decoration:none;font-weight:600">Открыть сайт по основной ссылке</a> <span style="font-size:13px">и сохраните её в закладки браузера</span>`;
   document.querySelector('.wrap header').after(w);
+}
+async function storeInfo(){
+  const el = $('storeInfo'); if(!el) return;
+  const calls = HIST.filter(x=>!x.multi&&!x.trainee), last = calls[0];
+  let pers = ''; try{ if(navigator.storage && navigator.storage.persisted) pers = (await navigator.storage.persisted()) ? ' · хранилище закреплено ✅' : ''; }catch(e){}
+  el.innerHTML = location.hostname === 'raw.githack.com' && STORE_OK
+    ? `💾 Сохранено в этом браузере: <b>${calls.length}</b> разборов${last?`, последний — ${esc(new Date(+last.id).toLocaleString('ru-RU'))}`:''}${pers}`
+    : `<span style="color:#b91c1c">⚠️ Здесь разборы не сохраняются — откройте <a href="${HOME_LINK}" target="_blank" rel="noopener">основную ссылку</a>.</span>`;
 }
 /* ---------- history ---------- */
 function saveHistory(c){
@@ -1251,7 +1265,7 @@ function renderHistory(){
 const dayKey = x => { const d = new Date(+x.id); return isNaN(d) ? (String(x.date||'').split(',')[0]||'—') : d.toLocaleDateString('ru-RU'); };
 function renderDays(){
   const h = getHist(); if(!$('days')) return;
-  if(!h.length){ $('days').innerHTML = '<p class="muted">Пока нет разборов.</p>'; return; }
+  if(!h.length){ $('days').innerHTML = '<p class="muted">Пока нет разборов в этом браузере. Если вы уже делали разборы, а их здесь нет, — значит, сайт тогда был открыт в другом месте (в приложении Claude, в скачанном файле, в другом браузере или в режиме инкогнито). Всегда открывайте сайт по одной ссылке из закладок.</p>'; return; }
   const days = []; const byDay = {};
   h.forEach(x => { const k = dayKey(x); if(!byDay[k]){ byDay[k] = {}; days.push(k); } const o = x.operator||'Без имени'; (byDay[k][o] = byDay[k][o]||[]).push(x); });
   const today = new Date().toLocaleDateString('ru-RU'), yest = new Date(Date.now()-864e5).toLocaleDateString('ru-RU');
