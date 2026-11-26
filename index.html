@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v49</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v50</small></h1>
     <span style="display:flex;gap:8px"><button class="primary" id="btnArchive" title="Все прошлые разборы по дням">🗂 Архив</button><button id="btnSettings">⚙️ Настройки</button></span>
   </header>
 
@@ -129,6 +129,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
       <span class="muted">или нажмите, чтобы выбрать файлы · несколько звонков одного оператора = сводный разбор · mp3, m4a, wav, ogg, mp4, webm</span>
       <input type="file" id="file" accept="audio/*,video/*" multiple hidden>
     </div>
+    <div id="queue" class="hidden" style="margin-top:10px"></div>
     <div class="status hidden" id="status"><span id="statusText"></span><div class="bar"><i id="barFill"></i></div></div>
   </div>
 
@@ -348,6 +349,7 @@ async function groq(path, body, isForm){
         status('Лимит модели на сегодня исчерпан, переключаюсь на другую…');
         throw new Error('лимит '+body.model);
       }
+      if(!isForm && attempt >= 2) throw new Error('TPM_BUSY'); // модель занята — пробуем другую, а не ждём бесконечно
       const wait = Math.min(60, ra);
       status(`Бесплатный лимит Groq: жду ${Math.ceil(wait)} сек и продолжаю…`);
       await new Promise(res => setTimeout(res, wait*1000)); continue;
@@ -359,7 +361,7 @@ async function groq(path, body, isForm){
   throw new Error('Groq перегружен, попробуйте через минуту.');
 }
 
-let liveModels = null; const badModels = new Set();
+let liveModels = null; const badModels = new Set(); let dayLimited = false;
 async function modelQueue(){
   const pick = LS.get('model','auto');
   let q = [...new Set([pick, ...MODELS].filter(m => m && m!=='auto'))];
@@ -375,10 +377,16 @@ async function modelQueue(){
   return q.filter(m => !badModels.has(m));
 }
 const SMALL = /gpt-oss-20b|qwen|8b|scout/i;
+const TPM = {'openai/gpt-oss-120b':8000,'openai/gpt-oss-20b':8000,'llama-3.3-70b-versatile':12000,'meta-llama/llama-4-scout-17b-16e-instruct':30000,'meta-llama/llama-4-maverick-17b-128e-instruct':6000,'llama-3.1-8b-instant':6000,'qwen/qwen3-32b':6000};
 async function chatJSON(system, user, opt){
   opt = opt || {};
   let q = await modelQueue(); let lastErr;
   if(opt.small) q = [...q.filter(m => SMALL.test(m)), ...q.filter(m => !SMALL.test(m))];
+  { // бесплатный лимит токенов в минуту у моделей разный: слишком большой запрос сразу отдаём модели, в которую он влезет
+    const est = Math.ceil((system.length + user.length)/4) + (opt.max || 3000);
+    const fit = q.filter(m => est <= (TPM[m] || 8000)*0.95);
+    if(fit.length && fit.length < q.length) q = [...fit, ...q.filter(m => !fit.includes(m))];
+  }
   for(const model of q){
     try{
       const body = {model, temperature: 0.2, response_format: {type:'json_object'}, max_completion_tokens: opt.max || 3000,
@@ -392,11 +400,16 @@ async function chatJSON(system, user, opt){
       return JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}')+1));
     }catch(e){
       lastErr = e;
-      if(/does not exist|not have access|decommissioned|not found|not supported|лимит/i.test(e.message)){ badModels.add(model); continue; }
+      if(/does not exist|not have access|decommissioned|not found|not supported|лимит/i.test(e.message)){ badModels.add(model); if(/^лимит /.test(e.message)) dayLimited = true; continue; }
       if(/json|Unexpected|too large|reduce|context|tokens per minute|TPM/i.test(e.message)) continue;
+      if(/Failed to fetch|NetworkError|Load failed|перегружен|50\d/i.test(e.message)) continue;
       throw e;
     }
   }
+  const m = lastErr ? lastErr.message : '';
+  if(/TPM_BUSY|tokens per minute/i.test(m)) throw new Error('Бесплатный лимит Groq в минуту сейчас занят на всех моделях. Подождите 1–2 минуты и нажмите «Повторить».');
+  if(/too large|reduce/i.test(m)) throw new Error('Запрос не влезает в бесплатный лимит Groq ни на одной модели.');
+  if(/^лимит /.test(m) || (!lastErr && dayLimited)) throw new Error('Дневной бесплатный лимит Groq на сегодня исчерпан на всех моделях. Продолжить можно позже (лимит обновляется в течение суток).');
   throw lastErr || new Error('Нет доступной модели Groq.');
 }
 
@@ -627,6 +640,13 @@ async function translateRep(rep, target){ // target 'es': убрать русс�
   return rep;
 }
 async function fixSpanish(rep){ if(rep && !rep.error && CYR.test(JSON.stringify(rep))) status('Перевожу русские вставки в разборе на испанский…', 97); return translateRep(rep, 'es'); }
+
+// в основном разборе не повторяем общие правила, которые уже есть в «Правилах компании» (экономим бесплатный лимит Groq)
+function globalFor(rb){
+  const dup = [[/^ЗАПРЕЩЕНО НА ВСЕХ ЛИНИЯХ/, /есть ли у него время/], [/^ПРЕДСТАВЛЕНИЕ НА ВСЕХ ЛИНИЯХ/, /ПРЕДСТАВЛЕНИЕ НА ВСЕХ ЛИНИЯХ/], [/^ОПЛАТА НА ВСЕХ ЛИНИЯХ/, /13\. ОПЛАТА/],
+    [/^ВОЗВРАТОВ НЕТ НА ВСЕХ ЛИНИЯХ/, /ВОЗВРАТОВ НЕТ/], [/^КОНТАКТЫ ПОДДЕРЖКИ/, /КОНТАКТЫ ПОДДЕРЖКИ/], [/^ЖАЛОБА НА ПОСЫЛКУ/, /жалоба на посылку/i]];
+  return GLOBAL_RULES.split('\n').filter(l => !dup.some(([a,b]) => a.test(l) && b.test(rb))).join('\n');
+}
 async function analyze(turns, language, lang, line, result){
   lang = lang || 'es'; const t = T[lang]; const L = LINES[line||'ol'];
   const ctx = $('context').value ? `Оператор продаёт: ${$('context').value}.\n` : '';
@@ -641,7 +661,7 @@ async function analyze(turns, language, lang, line, result){
   status(lang==='es'?'Готовлю отчёт на испанском…':'Анализирую разговор и готовлю рекомендации…', 84);
   const sysCore = `Ты — опытный тренер по продажам и отработке возражений. Проанализируй звонок оператора с клиентом.
 ${head}
-${GLOBAL_RULES}${rulesBlock()}${priceBlock()}
+${globalFor(rulesBlock())}${rulesBlock()}${priceBlock()}
 ЛИНИЯ И ЭТАПЫ ПРОДАЖ: ${stagesText}
 ${presText}
 Оценивай звонок именно по этим этапам: в "stages" перечисли ВСЕ этапы этой линии в указанном порядке (даже если этап пропущен — тогда низкая оценка и пометка «пропущен»).${lang==='es'?' Обращайся к оператору на «tú», доброжелательно, как тренер.':''}
@@ -657,7 +677,7 @@ ${presText}
 "objections":[{"objection":"возражение клиента","operator_response":"как ответил оператор","verdict":"${t.verdicts}","better_response":"сильный ответ по технике (присоединение, уточнение, аргумент, вопрос-закрытие)"}],
 "recommendations":["конкретные советы оператору на следующий звонок"],
 "script":"короткий улучшенный вариант ключевого момента звонка"}`;
-  const rep = await chatJSON(sysCore, src, {max:3000});
+  const rep = await chatJSON(sysCore, src, {max:2600});
   // запрос 2: статусы, регламент и скрипт продукта (отдельно, чтобы каждый запрос влезал в бесплатный лимит)
   const prods = (line==='base' || line==='fiz') ? detectProducts(turns) : []; // эти скрипты только для второй линии (База и Физика)
   status(lang==='es'?'Проверяю статус, регламент и продукт…':'Проверяю статус, регламент и скрипт продукта…', 92);
@@ -723,9 +743,19 @@ async function run(file, prefix, many){
 async function runMany(files){
   if(files.length===1) return run(files[0]);
   const t0 = Date.now(), items = [];
-  for(let i=0;i<files.length;i++) items.push(await run(files[i], `Звонок ${i+1} из ${files.length}: `, true));
+  const q = $('queue'); q.classList.remove('hidden');
+  const row = (i, icon, txt) => { const el = document.getElementById('q'+i); if(el) el.innerHTML = `${icon} <b>${esc(files[i].name)}</b> <span class="muted">${esc(txt)}</span>`; };
+  q.innerHTML = '<b>Очередь звонков</b>' + [...files].map((f,i)=>`<div class="item" id="q${i}"></div>`).join('');
+  [...files].forEach((f,i)=>row(i,'⏸️','ждёт очереди'));
+  for(let i=0;i<files.length;i++){
+    row(i,'⏳','разбираю…');
+    let it; try{ it = await run(files[i], `Звонок ${i+1} из ${files.length}: `, true); }catch(e){ it = {name:files[i].name, report:{error:e.message}}; }
+    items.push(it);
+    const r = it && it.report;
+    if(r && !r.error) row(i,'✅',`готов · ${r.score??'—'}/10`); else row(i,'❌','не разобран: '+((r&&r.error)||'неизвестная ошибка'));
+  }
   const ok = items.filter(x=>x && x.report && !x.report.error);
-  if(!ok.length){ status('⚠️ Ни один звонок не удалось разобрать.',0); return; }
+  if(!ok.length){ status('⚠️ Ни один звонок не удалось разобрать — причина указана у каждого звонка в очереди выше.',0); return; }
   const lang = 'ru'; // общий итог по всем звонкам — сначала на русском, испанский по кнопке
   const calls = ok.map(x=>({id:x.id, name:x.name, score:x.report.score, report:x.report}));
   const line = $('line').value; let report; try{ report = await summarize(calls, lang, line); }catch(e){ report = {error:e.message}; }
