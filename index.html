@@ -67,7 +67,7 @@ details.op summary button{font-size:12px;padding:4px 10px;font-weight:400}
 <body>
 <div class="wrap">
   <header>
-    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v50</small></h1>
+    <h1>🎧 Разбор звонков <small class="muted" style="font-weight:400">v51</small></h1>
     <span style="display:flex;gap:8px"><button class="primary" id="btnArchive" title="Все прошлые разборы по дням">🗂 Архив</button><button id="btnSettings">⚙️ Настройки</button></span>
   </header>
 
@@ -1249,8 +1249,11 @@ async function storeInfo(){
   const el = $('storeInfo'); if(!el) return;
   const calls = HIST.filter(x=>!x.multi&&!x.trainee), last = calls[0];
   let pers = ''; try{ if(navigator.storage && navigator.storage.persisted) pers = (await navigator.storage.persisted()) ? ' · хранилище закреплено ✅' : ''; }catch(e){}
+  const since = LS.get('first_seen', null);
+  let quota = 0; try{ if(navigator.storage && navigator.storage.estimate) quota = (await navigator.storage.estimate()).quota||0; }catch(e){}
+  const incog = quota && quota < 1.2e9;
   el.innerHTML = location.hostname === 'raw.githack.com' && STORE_OK
-    ? `💾 Сохранено в этом браузере: <b>${calls.length}</b> разборов${last?`, последний — ${esc(new Date(+last.id).toLocaleString('ru-RU'))}`:''}${pers}`
+    ? `💾 Сохранено в этом браузере: <b>${calls.length}</b> разборов${last?`, последний — ${esc(new Date(+last.id).toLocaleString('ru-RU'))}`:''}${pers}<br>🕓 Браузер помнит сайт с: <b>${since?esc(new Date(since).toLocaleString('ru-RU')):'—'}</b>${since && Date.now()-since < 6*3600e3 ? ' <span style="color:#b45309">(если вы пользовались сайтом раньше в этом же браузере — значит, браузер стирает данные сайта при закрытии)</span>':''}${incog?'<br><span style="color:#b91c1c">⚠️ Похоже, открыт режим инкогнито/приватное окно — в нём архив пропадает после закрытия. Откройте сайт в обычном окне браузера.</span>':''}`
     : `<span style="color:#b91c1c">⚠️ Здесь разборы не сохраняются — откройте <a href="${HOME_LINK}" target="_blank" rel="noopener">основную ссылку</a>.</span>`;
 }
 /* ---------- history ---------- */
@@ -1337,6 +1340,7 @@ $('btnClearArchive').onclick = () => { const me = opName(); removeWhere(x=>(x.op
 $('btnClearMine').onclick = () => { const me = opName(); removeWhere(x=>(x.operator||'Без имени')===me, `Удалить все звонки оператора «${me}» ({n} разборов)?`); };
 $('btnArchive').onclick = () => { renderDays(); const c = $('daysCard'); const d = c.querySelector('details'); if(d) d.open = true; c.scrollIntoView({behavior:'smooth', block:'start'}); };
 storageWarning();
+try{ if(!LS.get('first_seen', null)) LS.set('first_seen', Date.now()); }catch(e){}
 loadSettings(); prodInfo(); loadHist().then(()=>{ renderHistory(); updateArchiveBadge(); }, renderHistory);
 </script>
 </body>
